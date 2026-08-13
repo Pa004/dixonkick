@@ -13,3 +13,10 @@ export const LEAGUES: Record<string, { espn: string; label: string; model: strin
 };
 
 export const DB_PATH = process.env.DB_PATH || fileURLToPath(new URL("../data/futbol.db", import.meta.url));
+
+export const CORS_ORIGINS = (process.env.CORS_ORIGINS ?? "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+export const REFRESH_TOKEN = process.env.REFRESH_TOKEN ?? "";

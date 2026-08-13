@@ -3,12 +3,21 @@ import cors from "cors";
 import express from "express";
 import cron from "node-cron";
 
-import { ML_URL, PORT } from "./config.js";
+import { CORS_ORIGINS, ML_URL, PORT } from "./config.js";
 import { api } from "./routes/api.js";
 import { runSync } from "./services/predict.js";
 
 const app = express();
-app.use(cors());
+
+// Cabeceras de seguridad mínimas (sin dependencias extra)
+app.use((_req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "no-referrer");
+  next();
+});
+
+app.use(cors({ origin: CORS_ORIGINS.length ? CORS_ORIGINS : true }));
 app.use(express.json());
 app.use("/api", api);
 

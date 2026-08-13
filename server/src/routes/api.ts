@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { LEAGUES } from "../config.js";
+import { LEAGUES, REFRESH_TOKEN } from "../config.js";
 import { db } from "../db.js";
 import { runSync } from "../services/predict.js";
 
@@ -74,11 +74,36 @@ api.get("/stats", (_req, res) => {
   });
 });
 
-api.post("/refresh", async (_req, res) => {
-  try {
-    const result = await runSync();
-    res.json(result);
-  } catch (err) {
-    res.status(502).json({ error: (err as Error).message });
+// Rate limit en memoria para /refresh (evita DoS trivial)
+const refreshHits = new Map<string, { count: number; resetAt: number }>();
+const REFRESH_LIMIT = 5;
+const REFRESH_WINDOW_MS = 60_000;
+
+function rateLimited(key: string): boolean {
+  const now = Date.now();
+  const entry = refreshHits.get(key);
+  if (!entry || entry.resetAt < now) {
+    refreshHits.set(key, { count: 1, resetAt: now + REFRESH_WINDOW_MS });
+    return false;
   }
+  entry.count++;
+  return entry.count > REFRESH_LIMIT;
+}
+
+api.post("/refresh", (req, res) => {
+  if (!REFRESH_TOKEN) {
+    res.status(503).json({ error: "REFRESH_TOKEN no configurado" });
+    return;
+  }
+  if (req.header("x-refresh-token") !== REFRESH_TOKEN) {
+    res.status(401).json({ error: "token inválido" });
+    return;
+  }
+  if (rateLimited(req.ip ?? "unknown")) {
+    res.status(429).json({ error: "demasiadas solicitudes" });
+    return;
+  }
+  runSync()
+    .then((result) => res.json(result))
+    .catch((err) => res.status(502).json({ error: (err as Error).message }));
 });
