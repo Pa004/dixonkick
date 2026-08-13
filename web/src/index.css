@@ -1,0 +1,54 @@
+@import url("https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Inter:wght@400;500;600;700&display=swap");
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-display: "Sora", "Inter", sans-serif;
+
+  --color-acento-50: oklch(0.985 0.008 170);
+  --color-acento-100: oklch(0.965 0.02 170);
+  --color-acento-200: oklch(0.93 0.05 170);
+  --color-acento-300: oklch(0.88 0.095 170);
+  --color-acento-400: oklch(0.805 0.135 170);
+  --color-acento-500: oklch(0.72 0.155 170);
+  --color-acento-600: oklch(0.635 0.135 170);
+  --color-acento-700: oklch(0.55 0.115 170);
+  --color-acento-800: oklch(0.45 0.09 170);
+  --color-acento-900: oklch(0.34 0.06 170);
+  --color-acento-950: oklch(0.245 0.04 170);
+
+  --color-neutro-50: oklch(0.987 0.003 262);
+  --color-neutro-100: oklch(0.963 0.004 262);
+  --color-neutro-200: oklch(0.925 0.006 262);
+  --color-neutro-300: oklch(0.845 0.009 262);
+  --color-neutro-400: oklch(0.7 0.011 262);
+  --color-neutro-500: oklch(0.58 0.012 262);
+  --color-neutro-600: oklch(0.47 0.01 262);
+  --color-neutro-700: oklch(0.37 0.009 262);
+  --color-neutro-800: oklch(0.28 0.008 262);
+  --color-neutro-850: oklch(0.24 0.007 262);
+  --color-neutro-900: oklch(0.205 0.006 262);
+  --color-neutro-950: oklch(0.14 0.005 262);
+
+  --color-visita-300: oklch(0.8 0.14 20);
+  --color-visita-400: oklch(0.718 0.185 20);
+  --color-visita-500: oklch(0.637 0.215 20);
+  --color-visita-600: oklch(0.555 0.19 20);
+  --color-visita-700: oklch(0.475 0.145 20);
+
+  --color-empate-300: oklch(0.83 0.015 262);
+  --color-empate-400: oklch(0.72 0.02 262);
+  --color-empate-500: oklch(0.62 0.025 262);
+  --color-empate-700: oklch(0.44 0.015 262);
+
+  --radius-base: 0.75rem;
+  --radius-full: 9999px;
+
+  --shadow-card: 0 1px 2px oklch(0.04 0.01 262 / 0.4), 0 8px 24px -12px oklch(0.04 0.01 262 / 0.6);
+  --shadow-elevated: 0 0 0 1px oklch(0.85 0.05 170 / 0.07), 0 24px 48px -12px oklch(0.04 0.01 262 / 0.75);
+  --shadow-glow: 0 0 0 1px oklch(0.72 0.155 170 / 0.3), 0 8px 40px oklch(0.72 0.155 170 / 0.22);
+}
+
+body {
+  @apply bg-neutro-950 text-neutro-100 antialiased;
+}
