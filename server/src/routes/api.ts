@@ -39,26 +39,29 @@ api.get("/fixtures", (req, res) => {
       "SELECT * FROM fixtures WHERE (? = '' OR league = ?) AND date > datetime('now', '-2 days') ORDER BY date LIMIT 100",
     )
     .all(league, league) as Record<string, unknown>[];
-  res.json(rows.map((r) => ({
-    id: r.id,
-    league: r.league,
-    date: r.date,
-    home: r.home,
-    away: r.away,
-    homeShort: r.home_short,
-    awayShort: r.away_short,
-    status: r.status,
-    homeScore: r.home_score,
-    awayScore: r.away_score,
-    prediction: r.prediction ? safeJson(r.prediction as string) : null,
-    predictedAt: r.predicted_at,
-  })));
+  res.json(
+    rows.map((r) => ({
+      id: r.id,
+      league: r.league,
+      date: r.date,
+      home: r.home,
+      away: r.away,
+      homeShort: r.home_short,
+      awayShort: r.away_short,
+      status: r.status,
+      homeScore: r.home_score,
+      awayScore: r.away_score,
+      prediction: r.prediction ? safeJson(r.prediction as string) : null,
+      predictedAt: r.predicted_at,
+    })),
+  );
 });
 
 api.get("/stats", (_req, res) => {
-  const totals = db
-    .prepare("SELECT COUNT(*) n, SUM(hit) hits FROM tracked")
-    .get() as { n: number; hits: number };
+  const totals = db.prepare("SELECT COUNT(*) n, SUM(hit) hits FROM tracked").get() as {
+    n: number;
+    hits: number;
+  };
   const bands = BANDS.map(([label, lo, hi]) => {
     const row = db
       .prepare("SELECT COUNT(*) n, SUM(hit) hits FROM tracked WHERE confidence >= ? AND confidence < ?")

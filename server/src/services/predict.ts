@@ -38,9 +38,8 @@ export async function refreshFixtures(): Promise<{ inserted: number; predicted: 
       continue;
     }
     for (const fx of fixtures) {
-      const existing = db
-        .prepare("SELECT home_model, prediction FROM fixtures WHERE id = ?")
-        .get(fx.id) as { home_model: string | null; prediction: string | null } | undefined;
+      const existing = db.prepare("SELECT home_model, prediction FROM fixtures WHERE id = ?").get(fx.id) as
+        { home_model: string | null; prediction: string | null } | undefined;
       const upsert = db.prepare(`
         INSERT INTO fixtures
           (id, league, date, home, away, home_short, away_short, status, home_score, away_score)
@@ -50,8 +49,16 @@ export async function refreshFixtures(): Promise<{ inserted: number; predicted: 
           home_score=excluded.home_score, away_score=excluded.away_score
       `);
       upsert.run(
-        fx.id, code, fx.date, fx.home, fx.away, fx.homeShort, fx.awayShort,
-        fx.status, fx.homeScore, fx.awayScore,
+        fx.id,
+        code,
+        fx.date,
+        fx.home,
+        fx.away,
+        fx.homeShort,
+        fx.awayShort,
+        fx.status,
+        fx.homeScore,
+        fx.awayScore,
       );
       inserted++;
 
@@ -97,7 +104,9 @@ export async function runSync(): Promise<{ inserted: number; predicted: number; 
 
 export function checkResults(): number {
   const pending = db
-    .prepare("SELECT * FROM fixtures WHERE status='post' AND result_checked=0 AND prediction IS NOT NULL AND home_score IS NOT NULL")
+    .prepare(
+      "SELECT * FROM fixtures WHERE status='post' AND result_checked=0 AND prediction IS NOT NULL AND home_score IS NOT NULL",
+    )
     .all() as {
     id: string;
     home_score: number;

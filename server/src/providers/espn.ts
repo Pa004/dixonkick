@@ -10,10 +10,7 @@ interface EspnEvent {
 }
 
 function isoDay(offsetDays: number): string {
-  return new Date(Date.now() + offsetDays * 86_400_000)
-    .toISOString()
-    .slice(0, 10)
-    .replace(/-/g, "");
+  return new Date(Date.now() + offsetDays * 86_400_000).toISOString().slice(0, 10).replace(/-/g, "");
 }
 
 export async function fetchLeagueFixtures(espnLeague: string): Promise<

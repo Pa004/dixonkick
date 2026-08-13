@@ -101,17 +101,16 @@ describe("refreshFixtures", () => {
   });
 
   it("persiste la predicción cuando los equipos resuelven", async () => {
-    espnMock.mockImplementation(async (espnLeague) =>
-      espnLeague === "eng.1" ? [fixture("epl-2")] : [],
-    );
+    espnMock.mockImplementation(async (espnLeague) => (espnLeague === "eng.1" ? [fixture("epl-2")] : []));
     teamsMock.mockResolvedValue("Man City");
 
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () =>
-        new Response(JSON.stringify({ pick: "H", confidence: { level: "seguro", probability: 0.7 } }), {
-          status: 200,
-        }),
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ pick: "H", confidence: { level: "seguro", probability: 0.7 } }), {
+            status: 200,
+          }),
       ),
     );
 
