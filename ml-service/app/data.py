@@ -25,6 +25,8 @@ def load_history(leagues: dict[str, str] | None = None) -> pd.DataFrame:
     data = pd.concat(frames, ignore_index=True)
     data["Date"] = pd.to_datetime(data["Date"], dayfirst=True, errors="coerce")
     data = data[(data["Date"].dt.year >= 2000) & (data["Date"].dt.year <= 2030)]
+    data["FTHG"] = pd.to_numeric(data["FTHG"], errors="coerce")
+    data["FTAG"] = pd.to_numeric(data["FTAG"], errors="coerce")
     data = data.dropna(subset=["Date", "FTHG", "FTAG", "HomeTeam", "AwayTeam"])
     data["FTHG"] = data["FTHG"].astype(int)
     data["FTAG"] = data["FTAG"].astype(int)

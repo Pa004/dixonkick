@@ -3,6 +3,8 @@ import { LEAGUES, REFRESH_TOKEN } from "../config.js";
 import { db } from "../db.js";
 import { runSync } from "../services/predict.js";
 
+// Espejo de CONFIDENCE_BANDS en ml-service/app/models/dixon_coles.py:
+// limite inferior inclusivo (>= lo AND < hi). Mantener en sincronía.
 const BANDS: [string, number, number][] = [
   ["Seguro", 0.65, 1.01],
   ["Probable", 0.55, 0.65],

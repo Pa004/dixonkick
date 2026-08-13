@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -11,7 +12,6 @@ from app.models.dixon_coles import DixonColes
 
 MODEL_PATH = Path(__file__).resolve().parent.parent / "artifacts" / "dixon_coles.npz"
 
-app = FastAPI(title="FutbolTipster ML Service", version="0.1.0")
 model: DixonColes | None = None
 
 
@@ -20,12 +20,16 @@ class Fixture(BaseModel):
     away: str
 
 
-@app.on_event("startup")
-def _load_model() -> None:
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
     global model
     if not MODEL_PATH.exists():
         raise RuntimeError(f"Modelo no encontrado: {MODEL_PATH} (ejecuta scripts/train.py)")
     model = DixonColes.load(MODEL_PATH)
+    yield
+
+
+app = FastAPI(title="FutbolTipster ML Service", version="0.1.0", lifespan=lifespan)
 
 
 @app.get("/health")

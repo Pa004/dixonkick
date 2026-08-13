@@ -18,6 +18,15 @@ from scipy.stats import poisson
 
 DEFAULT_DECAY = 0.0025
 MAX_GOALS = 8
+HEATMAP_GOALS = 6  # la UI dibuja 6x6; el resto de la matriz se usa solo para cálculos
+
+# Umbrales de confianza (espejo de server/src/routes/api.ts BANDS): el pick cuyo
+# max(p_home, p_draw, p_away) >= umbral cae en esa banda, con límite inferior inclusivo.
+CONFIDENCE_BANDS = [
+    ("seguro", "Seguro", 0.65),
+    ("probable", "Probable", 0.55),
+    ("ajustado", "Ajustado", 0.45),
+]
 
 
 class DixonColes:
@@ -35,6 +44,7 @@ class DixonColes:
         teams = sorted(set(home_team) | set(away_team))
         self.teams = teams
         self.idx = {t: i for i, t in enumerate(teams)}
+        self.n_matches = len(home_team)
         n = len(teams)
         i_home = np.array([self.idx[t] for t in home_team])
         i_away = np.array([self.idx[t] for t in away_team])
@@ -118,6 +128,8 @@ class DixonColes:
             defense=self.defense,
             gamma=np.array([self.gamma]),
             rho=np.array([self.rho]),
+            n_matches=np.array([self.n_matches]),
+            saved_at=np.array([np.datetime64("now", "s")]),
         )
 
     @classmethod
@@ -172,17 +184,12 @@ class DixonColes:
             "expected_goals": {"home": self._lam_home(home, away), "away": self._lam_away(home, away)},
             "pick": pick,
             "confidence": confidence_label(most_likely),
-            "score_matrix": mat.tolist(),
+            "score_matrix": mat[:HEATMAP_GOALS, :HEATMAP_GOALS].tolist(),
         }
 
 
 def confidence_label(p: float) -> dict:
-    if p >= 0.65:
-        level, label = "seguro", "Seguro"
-    elif p >= 0.55:
-        level, label = "probable", "Probable"
-    elif p >= 0.45:
-        level, label = "ajustado", "Ajustado"
-    else:
-        level, label = "incierto", "Incierto"
-    return {"level": level, "label": label, "probability": round(p, 3)}
+    for level, label, threshold in CONFIDENCE_BANDS:
+        if p >= threshold:
+            return {"level": level, "label": label, "probability": round(p, 3)}
+    return {"level": "incierto", "label": "Incierto", "probability": round(p, 3)}
