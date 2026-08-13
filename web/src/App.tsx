@@ -7,7 +7,10 @@ const FOCUS = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visi
 
 function SkeletonCard() {
   return (
-    <div aria-hidden="true" className="rounded-base bg-neutro-900 p-5 shadow-card motion-reduce:animate-none animate-pulse">
+    <div
+      aria-hidden="true"
+      className="rounded-base bg-neutro-900 p-5 shadow-card motion-reduce:animate-none animate-pulse"
+    >
       <div className="h-3 w-1/3 rounded bg-neutro-800" />
       <div className="mt-4 flex items-center justify-between gap-3">
         <div className="h-4 w-1/4 rounded bg-neutro-800" />
@@ -37,7 +40,9 @@ export default function App() {
       setStats(s);
       setActive((cur) => cur || l[0]?.code || "");
     } catch {
-      setError("No se pudieron cargar los datos. Comprueba que los servicios estén activos e intenta de nuevo.");
+      setError(
+        "No se pudieron cargar los datos. Comprueba que los servicios estén activos e intenta de nuevo.",
+      );
     } finally {
       setLoading(false);
     }
@@ -54,11 +59,10 @@ export default function App() {
     if (leagues.length === 0) return;
     const idx = leagues.findIndex((l) => l.code === activeCode);
     if (idx < 0) return;
-    let next = idx;
     if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
       e.preventDefault();
       const dir = e.key === "ArrowRight" ? 1 : -1;
-      next = (idx + dir + leagues.length) % leagues.length;
+      const next = (idx + dir + leagues.length) % leagues.length;
       setActive(leagues[next].code);
       document.getElementById(`tab-${leagues[next].code}`)?.focus();
     }
@@ -102,7 +106,9 @@ export default function App() {
               .map((b) => (
                 <span key={b.band} className="rounded-full bg-neutro-800/70 px-2.5 py-1 text-neutro-400">
                   {b.band}:{" "}
-                  <b className="font-display tabular-nums text-neutro-200">{Math.round(b.accuracy! * 100)}%</b>
+                  <b className="font-display tabular-nums text-neutro-200">
+                    {Math.round(b.accuracy! * 100)}%
+                  </b>
                 </span>
               ))}
           </div>
@@ -135,47 +141,43 @@ export default function App() {
           ))}
         </div>
 
-        <div
-          id="panel-ligas"
-          role="tabpanel"
-          aria-labelledby={`tab-${activeCode}`}
-          className="min-h-40"
-        >
-        {loading ? (
-          <div role="status" aria-live="polite" className="flex flex-col gap-4">
-            {Array.from({ length: 3 }, (_, i) => (
-              <SkeletonCard key={i} />
-            ))}
-          </div>
-        ) : error ? (
-          <div className="flex flex-col items-center gap-4 py-16 text-center">
-            <ShieldAlert className="h-8 w-8 text-visita-400" aria-hidden="true" />
-            <p className="max-w-md text-sm text-neutro-400">{error}</p>
-            <button
-              type="button"
-              onClick={load}
-              className={`min-h-11 rounded-base border border-neutro-700 px-4 py-2 text-xs font-semibold text-neutro-300 transition-colors hover:border-acento-500/60 hover:text-acento-300 ${FOCUS}`}
-            >
-              Reintentar
-            </button>
-          </div>
-        ) : shown.length === 0 ? (
-          <div className="flex flex-col items-center gap-2 py-16 text-neutro-500">
-            <ShieldAlert className="h-8 w-8" aria-hidden="true" />
-            <p className="text-sm">No hay partidos próximos en esta liga.</p>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-4">
-            {shown.map((f) => (
-              <MatchCard key={f.id} fixture={f} />
-            ))}
-          </div>
-        )}
+        <div id="panel-ligas" role="tabpanel" aria-labelledby={`tab-${activeCode}`} className="min-h-40">
+          {loading ? (
+            <div role="status" aria-live="polite" className="flex flex-col gap-4">
+              {Array.from({ length: 3 }, (_, i) => (
+                <SkeletonCard key={i} />
+              ))}
+            </div>
+          ) : error ? (
+            <div className="flex flex-col items-center gap-4 py-16 text-center">
+              <ShieldAlert className="h-8 w-8 text-visita-400" aria-hidden="true" />
+              <p className="max-w-md text-sm text-neutro-400">{error}</p>
+              <button
+                type="button"
+                onClick={load}
+                className={`min-h-11 rounded-base border border-neutro-700 px-4 py-2 text-xs font-semibold text-neutro-300 transition-colors hover:border-acento-500/60 hover:text-acento-300 ${FOCUS}`}
+              >
+                Reintentar
+              </button>
+            </div>
+          ) : shown.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 py-16 text-neutro-500">
+              <ShieldAlert className="h-8 w-8" aria-hidden="true" />
+              <p className="text-sm">No hay partidos próximos en esta liga.</p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-4">
+              {shown.map((f) => (
+                <MatchCard key={f.id} fixture={f} />
+              ))}
+            </div>
+          )}
         </div>
 
         <p className="mt-8 text-center text-[11px] leading-relaxed text-neutro-500">
-          Los modelos de fútbol aciertan ~50-55% de los resultados: usa las bandas de confianza como referencia,
-          no como certeza. Datos: ESPN · Modelo Dixon-Coles entrenado con resultados 2014-2025 (football-data.co.uk).
+          Los modelos de fútbol aciertan ~50-55% de los resultados: usa las bandas de confianza como
+          referencia, no como certeza. Datos: ESPN · Modelo Dixon-Coles entrenado con resultados 2014-2025
+          (football-data.co.uk).
         </p>
       </main>
     </div>
