@@ -25,14 +25,19 @@ export default function App() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [active, setActive] = useState<string>("");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
     try {
       const [l, f, s] = await Promise.all([fetchLeagues(), fetchFixtures(), fetchStats()]);
       setLeagues(l);
       setFixtures(f);
       setStats(s);
       setActive((cur) => cur || l[0]?.code || "");
+    } catch {
+      setError("No se pudieron cargar los datos. Comprueba que los servicios estén activos e intenta de nuevo.");
     } finally {
       setLoading(false);
     }
@@ -46,7 +51,9 @@ export default function App() {
   const activeCode = active || leagues[0]?.code || "";
 
   const onTabKeyDown = (e: React.KeyboardEvent) => {
+    if (leagues.length === 0) return;
     const idx = leagues.findIndex((l) => l.code === activeCode);
+    if (idx < 0) return;
     let next = idx;
     if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
       e.preventDefault();
@@ -139,6 +146,18 @@ export default function App() {
             {Array.from({ length: 3 }, (_, i) => (
               <SkeletonCard key={i} />
             ))}
+          </div>
+        ) : error ? (
+          <div className="flex flex-col items-center gap-4 py-16 text-center">
+            <ShieldAlert className="h-8 w-8 text-visita-400" aria-hidden="true" />
+            <p className="max-w-md text-sm text-neutro-400">{error}</p>
+            <button
+              type="button"
+              onClick={load}
+              className={`min-h-11 rounded-base border border-neutro-700 px-4 py-2 text-xs font-semibold text-neutro-300 transition-colors hover:border-acento-500/60 hover:text-acento-300 ${FOCUS}`}
+            >
+              Reintentar
+            </button>
           </div>
         ) : shown.length === 0 ? (
           <div className="flex flex-col items-center gap-2 py-16 text-neutro-500">
