@@ -1,0 +1,84 @@
+"""Tests del contrato del modelo Dixon-Coles y de las bandas de confianza."""
+
+import sys
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import pytest
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from app.models.dixon_coles import CONFIDENCE_BANDS, DixonColes, confidence_label
+
+TEAMS = ["Alfa", "Beta", "Gamma", "Delta"]
+N = 400
+RNG = np.random.default_rng(7)
+
+
+def synthetic_fit():
+    """Dataset sintético con ventaja local clara (Alfa gana casi siempre en casa)."""
+    rng = RNG
+    strength = {t: i for i, t in enumerate(TEAMS)}
+    dates, home, away, gh, ga = [], [], [], [], []
+    for _ in range(N):
+        h = TEAMS[rng.integers(4)]
+        a = TEAMS[rng.integers(4)]
+        if h == a:
+            continue
+        lam_h = max(1.5 + 0.4 * (strength[h] - strength[a]) + 0.3, 0.1)
+        lam_a = max(1.2 + 0.4 * (strength[a] - strength[h]), 0.1)
+        dates.append(pd.Timestamp("2024-01-01") + pd.Timedelta(days=int(rng.integers(0, 300))))
+        home.append(h)
+        away.append(a)
+        gh.append(rng.poisson(lam_h))
+        ga.append(rng.poisson(lam_a))
+    model = DixonColes()
+    model.fit(np.array(dates), home, away, gh, ga)
+    return model
+
+
+def test_confidence_label_boundaries():
+    assert confidence_label(0.65)["level"] == "seguro"
+    assert confidence_label(0.6499)["level"] == "probable"
+    assert confidence_label(0.55)["level"] == "probable"
+    assert confidence_label(0.5499)["level"] == "ajustado"
+    assert confidence_label(0.45)["level"] == "ajustado"
+    assert confidence_label(0.3)["level"] == "incierto"
+    assert [b[2] for b in CONFIDENCE_BANDS] == [0.65, 0.55, 0.45]
+
+
+def test_predict_contract():
+    model = synthetic_fit()
+    p = model.predict("Alfa", "Beta")
+    probs = p["probabilities"]
+    assert sum(probs.values()) == pytest.approx(1.0, abs=1e-6)
+    assert p["pick"] in {"H", "D", "A"}
+    assert p["confidence"]["probability"] == pytest.approx(max(probs.values()), abs=1e-3)
+    assert p["over_25"] + p["under_25"] == pytest.approx(1.0)
+    assert 0 <= p["btts_yes"] <= 1
+    mat = p["score_matrix"]
+    assert len(mat) == 6 and len(mat[0]) == 6  # 6x6 para el heatmap
+    assert all(0 <= cell <= 1 for row in mat for cell in row)
+    # la submatriz mostrada no alcanza 1 porque el resto del tail queda fuera
+    assert sum(cell for row in mat for cell in row) < 1.0
+
+
+def test_home_advantage_reflected():
+    model = synthetic_fit()
+    p = model.predict("Delta", "Alfa")  # el más fuerte en casa contra el más débil fuera
+    assert p["expected_goals"]["home"] > p["expected_goals"]["away"]
+
+
+def test_save_load_roundtrip(tmp_path):
+    model = synthetic_fit()
+    path = str(tmp_path / "model.npz")
+    model.save(path)
+    loaded = DixonColes.load(path)
+    assert loaded.teams == model.teams
+    before = model.predict("Alfa", "Beta")
+    after = loaded.predict("Alfa", "Beta")
+    assert before["probabilities"] == pytest.approx(after["probabilities"])
+    data = np.load(path, allow_pickle=True)
+    assert "saved_at" in data and "n_matches" in data  # metadata versionada
+    assert int(data["n_matches"][0]) > 0
