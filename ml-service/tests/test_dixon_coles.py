@@ -79,6 +79,7 @@ def test_save_load_roundtrip(tmp_path):
     before = model.predict("Alfa", "Beta")
     after = loaded.predict("Alfa", "Beta")
     assert before["probabilities"] == pytest.approx(after["probabilities"])
+    assert loaded.n_matches == model.n_matches
     data = np.load(path, allow_pickle=True)
     assert "saved_at" in data and "n_matches" in data  # metadata versionada
     assert int(data["n_matches"][0]) > 0

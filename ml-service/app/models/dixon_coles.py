@@ -136,6 +136,7 @@ class DixonColes:
         model.defense = data["defense"]
         model.gamma = float(data["gamma"][0])
         model.rho = float(data["rho"][0])
+        model.n_matches = int(data["n_matches"][0])
         return model
 
     def _lam_home(self, home: str, away: str) -> float:
@@ -155,7 +156,8 @@ class DixonColes:
         p_home = float(mat[np.tril_indices_from(mat, -1)].sum())
         p_away = float(mat[np.triu_indices_from(mat, 1)].sum())
         p_draw = float(np.trace(mat))
-        home_idx, away_idx = np.where(mat == mat.max())
+        heat = mat[:HEATMAP_GOALS, :HEATMAP_GOALS]
+        home_idx, away_idx = np.where(heat == heat.max())
         scoreline = (int(home_idx[0]), int(away_idx[0]))
         goals = np.arange(mat.shape[0])
         mask_over25 = (goals[:, None] + goals[None, :]) >= 3
@@ -173,7 +175,7 @@ class DixonColes:
             "scoreline": {
                 "home": scoreline[0],
                 "away": scoreline[1],
-                "probability": float(mat.max()),
+                "probability": float(heat.max()),
             },
             "over_25": p_over25,
             "under_25": 1 - p_over25,
@@ -192,5 +194,5 @@ class DixonColes:
 def confidence_label(p: float) -> dict:
     for level, label, threshold in CONFIDENCE_BANDS:
         if p >= threshold:
-            return {"level": level, "label": label, "probability": round(p, 3)}
-    return {"level": "incierto", "label": "Incierto", "probability": round(p, 3)}
+            return {"level": level, "label": label, "probability": float(p)}
+    return {"level": "incierto", "label": "Incierto", "probability": float(p)}
