@@ -2,21 +2,28 @@ import { ML_URL } from "./config.js";
 
 let modelTeams: string[] | null = null;
 let cachedAt = 0;
+let inflight: Promise<string[]> | null = null;
 const TEAMS_TTL = 60 * 60 * 1000;
 
 export async function getModelTeams(): Promise<string[]> {
   if (modelTeams && Date.now() - cachedAt < TEAMS_TTL) return modelTeams;
-  try {
-    const res = await fetch(`${ML_URL}/teams`, { signal: AbortSignal.timeout(8000) });
-    if (!res.ok) throw new Error(`ml-service /teams: ${res.status}`);
-    const data = (await res.json()) as { teams: string[] };
-    modelTeams = data.teams;
-    cachedAt = Date.now();
-  } catch (err) {
-    if (modelTeams) return modelTeams; // caché vencida como respaldo
-    throw err;
-  }
-  return modelTeams;
+  if (inflight) return inflight;
+  inflight = (async () => {
+    try {
+      const res = await fetch(`${ML_URL}/teams`, { signal: AbortSignal.timeout(8000) });
+      if (!res.ok) throw new Error(`ml-service /teams: ${res.status}`);
+      const data = (await res.json()) as { teams: string[] };
+      modelTeams = data.teams;
+      cachedAt = Date.now();
+    } catch (err) {
+      if (modelTeams) return modelTeams; // caché vencida como respaldo
+      throw err;
+    } finally {
+      inflight = null;
+    }
+    return modelTeams;
+  })();
+  return inflight;
 }
 
 const OVERRIDES: Record<string, string> = {

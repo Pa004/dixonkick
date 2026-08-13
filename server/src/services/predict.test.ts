@@ -10,6 +10,7 @@ vi.mock("../teams.js", () => ({
 
 import { fetchLeagueFixtures } from "../providers/espn.js";
 import { resolveTeam } from "../teams.js";
+import { LEAGUES } from "../config.js";
 
 const espnMock = vi.mocked(fetchLeagueFixtures);
 const teamsMock = vi.mocked(resolveTeam);
@@ -84,6 +85,44 @@ describe("checkResults", () => {
     };
     expect(row.pick).toBe("H");
     expect(row.hit).toBe(1);
+  });
+
+  it("ignora un partido con away_score NULL", () => {
+    seedFixture({
+      id: "fx-4",
+      status: "post",
+      home_score: 2,
+      away_score: null,
+      prediction: JSON.stringify({ pick: "H", confidence: { probability: 0.6 } }),
+    });
+    expect(() => predict.checkResults()).not.toThrow();
+    const row = db.prepare("SELECT result_checked FROM fixtures WHERE id='fx-4'").get() as {
+      result_checked: number;
+    };
+    expect(row.result_checked).toBe(0);
+  });
+});
+
+describe("runSync", () => {
+  it("deduplica llamadas concurrentes con el mutex", async () => {
+    let release: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    let espnCalls = 0;
+    espnMock.mockImplementation(async () => {
+      espnCalls++;
+      await gate;
+      return [];
+    });
+    teamsMock.mockResolvedValue(null);
+
+    const first = predict.runSync();
+    const second = predict.runSync();
+    release!();
+    const [r1, r2] = await Promise.all([first, second]);
+
+    expect(r2).toEqual({ inserted: 0, predicted: 0, checked: 0 });
+    expect(espnCalls).toBe(Object.keys(LEAGUES).length);
+    expect(r1.inserted).toBeGreaterThanOrEqual(0);
   });
 });
 

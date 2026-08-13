@@ -104,7 +104,7 @@ api.post("/refresh", (req, res) => {
     res.status(401).json({ error: "token inválido" });
     return;
   }
-  if (rateLimited(req.ip ?? "unknown")) {
+  if (rateLimited(REFRESH_TOKEN)) {
     res.status(429).json({ error: "demasiadas solicitudes" });
     return;
   }

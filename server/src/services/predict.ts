@@ -105,7 +105,7 @@ export async function runSync(): Promise<{ inserted: number; predicted: number; 
 export function checkResults(): number {
   const pending = db
     .prepare(
-      "SELECT * FROM fixtures WHERE status='post' AND result_checked=0 AND prediction IS NOT NULL AND home_score IS NOT NULL",
+      "SELECT * FROM fixtures WHERE status='post' AND result_checked=0 AND prediction IS NOT NULL AND home_score IS NOT NULL AND away_score IS NOT NULL",
     )
     .all() as {
     id: string;
