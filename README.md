@@ -72,6 +72,21 @@ Resultados de referencia (3 temporadas out-of-sample 2023-2025): log-loss ~0.99,
 
 Ver `.env.example` (raíz) y `web/.env.example`. En producción, el web necesita `VITE_API_URL` apuntando al server si no usa proxy.
 
+## Calidad
+
+```bash
+# web (React)
+cd web && npm run lint && npm test && npm run typecheck
+
+# server (Express)
+cd server && npm run lint && npm test && npm run typecheck
+
+# ml-service (Python)
+cd ml-service && python -m ruff check app tests scripts && python -m ruff format --check . && python -m pytest tests -q
+```
+
+- Tests: vitest (web y server) y pytest (ml-service). El lock de dependencias de Python está en `ml-service/requirements.lock` (generado con `pip freeze`).
+
 ## API
 
 - `GET /api/leagues` — ligas y si tienen modelo
