@@ -10,8 +10,6 @@ Ajuste por maxima verosimilitud con decaimiento temporal.
 
 from __future__ import annotations
 
-import json
-
 import numpy as np
 from scipy.optimize import minimize
 from scipy.stats import poisson
@@ -55,7 +53,7 @@ class DixonColes:
 
         def unpack(p):
             attack = p[:n]
-            defense = p[n:2 * n]
+            defense = p[n : 2 * n]
             gamma = p[2 * n]
             rho = p[2 * n + 1]
             return attack, defense, gamma, rho
@@ -65,11 +63,7 @@ class DixonColes:
             lam_h = np.exp(attack[i_home] + defense[i_away] + gamma)
             lam_a = np.exp(attack[i_away] + defense[i_home])
             tau = self._tau(rho, lam_h, lam_a, home_goals, away_goals)
-            like = (
-                poisson.pmf(home_goals, lam_h)
-                * poisson.pmf(away_goals, lam_a)
-                * tau
-            )
+            like = poisson.pmf(home_goals, lam_h) * poisson.pmf(away_goals, lam_a) * tau
             like = np.clip(like, 1e-12, None)
             return -float(np.sum(weights * np.log(like)))
 
@@ -78,12 +72,14 @@ class DixonColes:
             attack, defense, _, _ = unpack(p)
             return nll(p) + 1e-6 * (attack.sum() ** 2 + defense.sum() ** 2)
 
-        p0 = np.concatenate([
-            np.zeros(n),
-            np.zeros(n),
-            [0.2],
-            [0.0],
-        ])
+        p0 = np.concatenate(
+            [
+                np.zeros(n),
+                np.zeros(n),
+                [0.2],
+                [0.0],
+            ]
+        )
         res = minimize(
             nll_pen,
             p0,
@@ -115,9 +111,7 @@ class DixonColes:
         x = grid_x.ravel()
         y = grid_y.ravel()
         tau = self._tau(self.rho, np.full_like(x, lam_h), np.full_like(x, lam_a), x, y)
-        probs = (
-            poisson.pmf(x, lam_h) * poisson.pmf(y, lam_a) * tau
-        ).reshape(max_g + 1, max_g + 1)
+        probs = (poisson.pmf(x, lam_h) * poisson.pmf(y, lam_a) * tau).reshape(max_g + 1, max_g + 1)
         return probs / probs.sum()
 
     def save(self, path: str) -> None:
@@ -133,7 +127,7 @@ class DixonColes:
         )
 
     @classmethod
-    def load(cls, path: str) -> "DixonColes":
+    def load(cls, path: str) -> DixonColes:
         data = np.load(path, allow_pickle=True)
         model = cls()
         model.teams = [str(t) for t in data["teams"]]
@@ -176,12 +170,19 @@ class DixonColes:
             pick = "A"
         return {
             "probabilities": {"home": p_home, "draw": p_draw, "away": p_away},
-            "scoreline": {"home": scoreline[0], "away": scoreline[1], "probability": float(mat.max())},
+            "scoreline": {
+                "home": scoreline[0],
+                "away": scoreline[1],
+                "probability": float(mat.max()),
+            },
             "over_25": p_over25,
             "under_25": 1 - p_over25,
             "btts_yes": p_btts,
             "btts_no": 1 - p_btts,
-            "expected_goals": {"home": self._lam_home(home, away), "away": self._lam_away(home, away)},
+            "expected_goals": {
+                "home": self._lam_home(home, away),
+                "away": self._lam_away(home, away),
+            },
             "pick": pick,
             "confidence": confidence_label(most_likely),
             "score_matrix": mat[:HEATMAP_GOALS, :HEATMAP_GOALS].tolist(),

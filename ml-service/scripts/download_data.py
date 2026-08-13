@@ -4,8 +4,6 @@ El sitio esta bloqueado desde la red local; r.jina.ai sirve el CSV
 envuelto en cabeceras de metadatos que se eliminan antes de guardar.
 """
 
-import csv
-import re
 import sys
 import time
 import urllib.request
@@ -41,7 +39,7 @@ def strip_jina_wrapper(text: str) -> str:
     idx = text.find(marker)
     if idx == -1:
         return text.strip()
-    return text[idx + len(marker):].strip()
+    return text[idx + len(marker) :].strip()
 
 
 def validate_rows(text: str, league: str) -> None:
@@ -52,9 +50,7 @@ def validate_rows(text: str, league: str) -> None:
     ncols = len(header)
     for row in rows[1:]:
         if len(row.split(",")) != ncols:
-            raise ValueError(
-                f"fila con {len(row.split(','))} columnas != {ncols}: {row[:80]}"
-            )
+            raise ValueError(f"fila con {len(row.split(','))} columnas != {ncols}: {row[:80]}")
     if "HomeTeam" not in header or "FTHG" not in header:
         raise ValueError(f"columnas esperadas ausentes: {header[:10]}")
     if "..." in text[-20:]:

@@ -62,11 +62,10 @@ def evaluate(df: pd.DataFrame) -> None:
         hit = pred_arr.argmax(axis=1) == obs
         all_results.extend(
             {"season": season, "best": b, "hit": int(h), "actual": int(o)}
-            for b, h, o in zip(best, hit, obs)
+            for b, h, o in zip(best, hit, obs, strict=True)
         )
         print(
-            f"Season {season}: log-loss={ll:.4f}  RPS={rps:.4f}  accuracy={acc:.4f} "
-            f"(n={len(obs)})"
+            f"Season {season}: log-loss={ll:.4f}  RPS={rps:.4f}  accuracy={acc:.4f} (n={len(obs)})"
         )
 
     res = pd.DataFrame(all_results)
@@ -78,11 +77,15 @@ def evaluate(df: pd.DataFrame) -> None:
             continue
         rate = band["hit"].mean()
         total += len(band)
-        print(f"{name:10s} n={len(band):4d}  rate={rate:.3f}  (pred centro {band['best'].mean():.3f})")
+        print(
+            f"{name:10s} n={len(band):4d}  rate={rate:.3f}  (pred centro {band['best'].mean():.3f})"
+        )
     print(f"\nTotal partidos evaluados: {total}")
 
 
 if __name__ == "__main__":
     data = load_history()
-    print(f"Partidos cargados: {len(data)}  |  Ligas: {data['League'].nunique()}  |  Equipos: {data['HomeTeam'].nunique()}")
+    print(
+        f"Partidos cargados: {len(data)}  |  Ligas: {data['League'].nunique()}  |  Equipos: {data['HomeTeam'].nunique()}"
+    )
     evaluate(data)
