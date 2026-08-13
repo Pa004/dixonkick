@@ -1,0 +1,27 @@
+# Node
+node_modules/
+dist/
+*.tsbuildinfo
+npm-debug.log*
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+
+# Datos y artefactos
+ml-service/data/
+ml-service/artifacts/
+server/data/
+*.npz
+
+# Entorno
+.env
+.env.local
+.env.*.local
+
+# Otros
+verify.png
+.DS_Store
+Thumbs.db
