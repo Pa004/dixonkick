@@ -1,18 +1,59 @@
-"""Servicio FastAPI: predicciones Dixon-Coles."""
+"""Servicio FastAPI: predicciones de mercados (Dixon-Coles FT/HT + conteos)."""
 
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+import numpy as np
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
+from app.models import markets
+from app.models.count_model import CountModel
 from app.models.dixon_coles import DixonColes
 
-MODEL_PATH = Path(__file__).resolve().parent.parent / "artifacts" / "dixon_coles.npz"
+ARTIFACT_DIR = Path(__file__).resolve().parent.parent / "artifacts"
 
-model: DixonColes | None = None
+FT_LINES = [0.5, 1.5, 2.5, 3.5, 4.5]
+AH_LINES = [-1.5, -1.0, -0.5, 0.0, 0.5, 1.0, 1.5]
+TEAM_TOTAL_LINES = [0.5, 1.5, 2.5]
+HT_LINES = [0.5, 1.5]
+
+# mercado -> (lineas total, lineas total por equipo, lineas handicap)
+COUNT_GROUPS: dict[str, tuple[list[float], list[float], list[float]]] = {
+    "corners": ([8.5, 9.5, 10.5], [3.5, 4.5, 5.5], [-2.5, -1.5]),
+    "bookings": ([3.5, 4.5, 5.5], [1.5, 2.5], [-1.5, -0.5]),
+    "shots_on_target": ([8.5], [3.5, 4.5], [-2.5, -1.5]),
+    "fouls": ([20.5, 22.5], [9.5, 10.5], [-2.5]),
+}
+
+
+class Models:
+    def __init__(self) -> None:
+        self.ft: DixonColes | None = None
+        self.ht: DixonColes | None = None
+        self.htft_cond: np.ndarray | None = None
+        self.counts: dict[str, CountModel] = {}
+
+    def load(self) -> None:
+        ft_path = ARTIFACT_DIR / "dixon_coles.npz"
+        if ft_path.exists():
+            self.ft = DixonColes.load(ft_path)
+        ht_path = ARTIFACT_DIR / "dixon_coles_ht.npz"
+        if ht_path.exists():
+            self.ht = DixonColes.load(ht_path)
+        for name in COUNT_GROUPS:
+            path = ARTIFACT_DIR / f"{name}.npz"
+            if path.exists():
+                self.counts[name] = CountModel.load(path)
+        cond_path = ARTIFACT_DIR / "htft_cond.npz"
+        if cond_path.exists():
+            with np.load(cond_path) as data:
+                self.htft_cond = data["cond"]
+
+
+models = Models()
 
 
 class Fixture(BaseModel):
@@ -22,31 +63,99 @@ class Fixture(BaseModel):
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    global model
-    if not MODEL_PATH.exists():
-        raise RuntimeError(f"Modelo no encontrado: {MODEL_PATH} (ejecuta scripts/train.py)")
-    model = DixonColes.load(MODEL_PATH)
+    models.load()
+    if models.ft is None:
+        raise RuntimeError(
+            f"Modelo base no encontrado en {ARTIFACT_DIR} (ejecuta scripts/train.py)"
+        )
     yield
 
 
-app = FastAPI(title="FutbolTipster ML Service", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="FutbolTipster ML Service", version="0.2.0", lifespan=lifespan)
+
+
+def build_prediction(home: str, away: str) -> dict:
+    assert models.ft is not None
+    base = models.ft.predict(home, away)
+    mat = models.ft.score_matrix(home, away)
+
+    out: dict = {
+        "ft": {
+            "double_chance": markets.double_chance(base["probabilities"]),
+            "over_under": markets.total_markets(mat, FT_LINES),
+            "asian_handicap": markets.asian_handicap(mat, AH_LINES),
+            "odd_even": markets.odd_even(mat),
+            "team_totals": markets.team_totals(mat, TEAM_TOTAL_LINES),
+            "clean_sheet": markets.clean_sheet(mat),
+            "correct_score_top": markets.correct_score_top(mat),
+        },
+        "first_goal": markets.first_event(
+            base["expected_goals"]["home"], base["expected_goals"]["away"]
+        ),
+    }
+
+    if models.ht is not None:
+        ht_pred = models.ht.predict(home, away)
+        ht_mat = models.ht.score_matrix(home, away)
+        ht_probs = ht_pred["probabilities"]
+        out["ht"] = {
+            "probabilities": ht_probs,
+            "double_chance": markets.double_chance(ht_probs),
+            "over_under": markets.total_markets(ht_mat, HT_LINES),
+            "btts_yes": ht_pred["btts_yes"],
+            "expected_goals": ht_pred["expected_goals"],
+        }
+        if models.htft_cond is not None:
+            out["ht_ft"] = markets.ht_ft_markets(
+                [ht_probs["home"], ht_probs["draw"], ht_probs["away"]], models.htft_cond
+            )
+
+    for name, (total_lines, team_lines, handicap_lines) in COUNT_GROUPS.items():
+        cm = models.counts.get(name)
+        if cm is None:
+            continue
+        pred = cm.predict(home, away)
+        pmf_h = np.asarray(pred["pmf_home"])
+        pmf_a = np.asarray(pred["pmf_away"])
+        out[name] = {
+            "total": markets.total_markets_pmf(pmf_h, pmf_a, total_lines),
+            "team_totals": markets.team_totals_pmf(pmf_h, pmf_a, team_lines),
+            "most": markets.most_markets(pmf_h, pmf_a),
+            "handicap": markets.count_handicap(pmf_h, pmf_a, handicap_lines),
+            "expected": pred["expected"],
+        }
+    if "corners" in out:
+        lam_c = out["corners"]["expected"]
+        out["first_corner"] = markets.first_event(lam_c["home"], lam_c["away"])
+
+    return {**base, "markets": out}
 
 
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok", "teams": len(model.teams) if model else 0}
+    return {"status": "ok", "teams": len(models.ft.teams) if models.ft else 0}
+
+
+@app.get("/models")
+def models_status() -> dict:
+    return {
+        "ft": models.ft is not None,
+        "ht": models.ht is not None,
+        "ht_ft_conditional": models.htft_cond is not None,
+        "counts": {name: name in models.counts for name in COUNT_GROUPS},
+    }
 
 
 @app.get("/teams")
 def teams() -> dict:
-    return {"teams": model.teams if model else []}
+    return {"teams": models.ft.teams if models.ft else []}
 
 
 @app.post("/predict")
 def predict(fixture: Fixture) -> dict:
-    if model is None:
+    if models.ft is None:
         raise HTTPException(status_code=503, detail="modelo no cargado")
     for team in (fixture.home, fixture.away):
-        if team not in model.idx:
+        if team not in models.ft.idx:
             raise HTTPException(status_code=404, detail=f"equipo desconocido: {team}")
-    return {"home": fixture.home, "away": fixture.away, **model.predict(fixture.home, fixture.away)}
+    return {"home": fixture.home, "away": fixture.away, **build_prediction(fixture.home, fixture.away)}

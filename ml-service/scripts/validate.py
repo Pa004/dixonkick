@@ -13,10 +13,18 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from app.data import load_history
+from app.data import BOOKINGS_AWAY, BOOKINGS_HOME, EVENT_COLS, load_history
+from app.models.count_model import CountModel
 from app.models.dixon_coles import DixonColes
 
 TEST_SEASONS = [2023, 2024, 2025]
+
+COUNT_COLS: dict[str, tuple[str, str]] = {
+    "corners": EVENT_COLS["corners"],
+    "bookings": (BOOKINGS_HOME, BOOKINGS_AWAY),
+    "shots_on_target": EVENT_COLS["shots_on_target"],
+    "fouls": EVENT_COLS["fouls"],
+}
 BANDS = [
     ("Seguro", 0.65, 1.01),
     ("Probable", 0.55, 0.65),
@@ -29,6 +37,41 @@ def rps_one(pred: np.ndarray, obs: int) -> float:
     cdf_pred = np.cumsum(pred)
     cdf_obs = np.cumsum(np.arange(3) == obs)
     return float(0.5 * np.sum((cdf_pred - cdf_obs) ** 2))
+
+
+def evaluate_counts(df: pd.DataFrame) -> None:
+    """Walk-forward de los conteos: log-loss de la distribucion del total."""
+    for name, (hcol, acol) in COUNT_COLS.items():
+        rows = df.dropna(subset=[hcol, acol])
+        total_ll = 0.0
+        n = 0
+        for season in TEST_SEASONS:
+            train = rows[rows["Date"].dt.year < season]
+            test = rows[rows["Date"].dt.year == season]
+            model = CountModel()
+            model.fit(
+                train["Date"],
+                train["HomeTeam"],
+                train["AwayTeam"],
+                train[hcol],
+                train[acol],
+            )
+            season_ll = 0.0
+            for row in test.itertuples(index=False):
+                pred = model.predict(row.HomeTeam, row.AwayTeam)
+                total = np.convolve(pred["pmf_home"], pred["pmf_away"])
+                obs = int(getattr(row, hcol) + getattr(row, acol))
+                if obs < total.size:
+                    season_ll += -np.log(np.clip(total[obs], 1e-12, None))
+                    n += 1
+            if len(test):
+                print(
+                    f"{name:15s} season {season}: log-loss total={season_ll / len(test):.4f} (n={len(test)})"
+                )
+                total_ll += season_ll
+        if n:
+            print(f"{name:15s} TOTAL: log-loss medio={total_ll / n:.4f} (n={n})")
+    print()
 
 
 def evaluate(df: pd.DataFrame) -> None:
@@ -89,3 +132,5 @@ if __name__ == "__main__":
         f"Partidos cargados: {len(data)}  |  Ligas: {data['League'].nunique()}  |  Equipos: {data['HomeTeam'].nunique()}"
     )
     evaluate(data)
+    print("\n--- Mercados de conteo (corners, bookings, tiros, faltas) ---")
+    evaluate_counts(data)

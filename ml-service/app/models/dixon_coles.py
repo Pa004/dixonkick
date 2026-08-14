@@ -35,6 +35,7 @@ class DixonColes:
         self.idx: dict[str, int] = {}
         self.attack: np.ndarray = np.array([])
         self.defense: np.ndarray = np.array([])
+        self.mu = 0.0
         self.gamma = 0.0
         self.rho = 0.0
 
@@ -51,45 +52,41 @@ class DixonColes:
         age_days = np.array([(ref - d).days for d in dates], dtype=float)
         weights = np.exp(-self.decay * age_days)
 
+        # Intercepto mu + equipo de referencia fijo: rompe la degeneracion de
+        # desplazamiento alpha+c / beta-c que dejaba el nivel mal determinado.
+        free = n - 1
+
         def unpack(p):
-            attack = p[:n]
-            defense = p[n : 2 * n]
-            gamma = p[2 * n]
-            rho = p[2 * n + 1]
-            return attack, defense, gamma, rho
+            mu = p[0]
+            attack_free = p[1 : 1 + free]
+            defense_free = p[1 + free : 1 + 2 * free]
+            gamma = p[1 + 2 * free]
+            rho = p[2 + 2 * free]
+            return mu, attack_free, defense_free, gamma, rho
 
         def nll(p) -> float:
-            attack, defense, gamma, rho = unpack(p)
-            lam_h = np.exp(attack[i_home] + defense[i_away] + gamma)
-            lam_a = np.exp(attack[i_away] + defense[i_home])
+            mu, attack_free, defense_free, gamma, rho = unpack(p)
+            att = np.concatenate([[0.0], attack_free])
+            de = np.concatenate([[0.0], defense_free])
+            lam_h = np.exp(np.clip(mu + att[i_home] + de[i_away] + gamma, -700, 700))
+            lam_a = np.exp(np.clip(mu + att[i_away] + de[i_home], -700, 700))
             tau = self._tau(rho, lam_h, lam_a, home_goals, away_goals)
             like = poisson.pmf(home_goals, lam_h) * poisson.pmf(away_goals, lam_a) * tau
             like = np.clip(like, 1e-12, None)
             return -float(np.sum(weights * np.log(like)))
 
-        # Centrado de ataques para identificabilidad (penalizacion suave)
-        def nll_pen(p) -> float:
-            attack, defense, _, _ = unpack(p)
-            return nll(p) + 1e-6 * (attack.sum() ** 2 + defense.sum() ** 2)
-
-        p0 = np.concatenate(
-            [
-                np.zeros(n),
-                np.zeros(n),
-                [0.2],
-                [0.0],
-            ]
-        )
+        base_rate = 0.5 * (float(np.mean(home_goals)) + float(np.mean(away_goals)))
+        p0 = np.concatenate([[np.log(max(base_rate, 1e-3))], np.zeros(2 * free), [0.2], [0.0]])
         res = minimize(
-            nll_pen,
+            nll,
             p0,
             method="L-BFGS-B",
             options={"maxiter": 2000},
         )
-        attack, defense, self.gamma, self.rho = unpack(res.x)
-        attack = attack - attack.mean()
-        defense = defense - defense.mean()
-        self.attack, self.defense = attack, defense
+        mu, attack_free, defense_free, self.gamma, self.rho = unpack(res.x)
+        self.mu = float(mu)
+        self.attack = np.concatenate([[0.0], attack_free])
+        self.defense = np.concatenate([[0.0], defense_free])
 
     def _tau(self, rho, lam_h, lam_a, x, y) -> np.ndarray:
         out = np.ones_like(x, dtype=float)
@@ -120,6 +117,7 @@ class DixonColes:
             teams=np.array(self.teams),
             attack=self.attack,
             defense=self.defense,
+            mu=np.array([self.mu]),
             gamma=np.array([self.gamma]),
             rho=np.array([self.rho]),
             n_matches=np.array([self.n_matches]),
@@ -134,16 +132,19 @@ class DixonColes:
         model.idx = {t: i for i, t in enumerate(model.teams)}
         model.attack = data["attack"]
         model.defense = data["defense"]
+        model.mu = float(data["mu"][0])
         model.gamma = float(data["gamma"][0])
         model.rho = float(data["rho"][0])
         model.n_matches = int(data["n_matches"][0])
         return model
 
     def _lam_home(self, home: str, away: str) -> float:
-        return float(np.exp(self._rate(home, "attack") + self._rate(away, "defense") + self.gamma))
+        lin = self.mu + self._rate(home, "attack") + self._rate(away, "defense") + self.gamma
+        return float(np.exp(np.clip(lin, -700, 700)))
 
     def _lam_away(self, home: str, away: str) -> float:
-        return float(np.exp(self._rate(away, "attack") + self._rate(home, "defense")))
+        lin = self.mu + self._rate(away, "attack") + self._rate(home, "defense")
+        return float(np.exp(np.clip(lin, -700, 700)))
 
     def _rate(self, team: str, attr: str) -> float:
         i = self.idx.get(team)
