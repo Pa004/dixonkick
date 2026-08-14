@@ -3,6 +3,16 @@ import { db } from "../db.js";
 import { fetchLeagueFixtures } from "../providers/espn.js";
 import { resolveTeam } from "../teams.js";
 
+function hasMarkets(prediction: string | null | undefined): boolean {
+  if (!prediction) return false;
+  try {
+    const parsed = JSON.parse(prediction) as { markets?: unknown };
+    return parsed.markets !== undefined;
+  } catch {
+    return false;
+  }
+}
+
 export async function predictFixture(home: string, away: string): Promise<object> {
   const res = await fetch(`${ML_URL}/predict`, {
     method: "POST",
@@ -62,7 +72,7 @@ export async function refreshFixtures(): Promise<{ inserted: number; predicted: 
       );
       inserted++;
 
-      if (fx.status === "pre" && league.model && !existing?.prediction) {
+      if (fx.status === "pre" && league.model && !hasMarkets(existing?.prediction)) {
         tasks.push({ id: fx.id, home: fx.home, away: fx.away });
       }
     }

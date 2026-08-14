@@ -161,6 +161,45 @@ describe("refreshFixtures", () => {
     };
     expect(JSON.parse(row.prediction).pick).toBe("H");
   });
+
+  it("re-predice una predicción en formato viejo (sin markets)", async () => {
+    seedFixture({
+      id: "epl-3",
+      prediction: JSON.stringify({ pick: "H", confidence: { probability: 0.7 } }),
+    });
+    espnMock.mockImplementation(async (espnLeague) => (espnLeague === "eng.1" ? [fixture("epl-3")] : []));
+    teamsMock.mockResolvedValue("Man City");
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({ pick: "D", confidence: { probability: 0.5 }, markets: { ft: { home: 0.3 } } }),
+            { status: 200 },
+          ),
+      ),
+    );
+
+    const result = await predict.refreshFixtures();
+    expect(result.predicted).toBe(1);
+    const row = db.prepare("SELECT prediction FROM fixtures WHERE id='epl-3'").get() as {
+      prediction: string;
+    };
+    expect(JSON.parse(row.prediction).markets).toBeDefined();
+  });
+
+  it("no re-predice una predicción que ya tiene markets", async () => {
+    seedFixture({
+      id: "epl-4",
+      prediction: JSON.stringify({ pick: "H", confidence: { probability: 0.7 }, markets: { ft: { home: 0.6 } } }),
+    });
+    espnMock.mockImplementation(async (espnLeague) => (espnLeague === "eng.1" ? [fixture("epl-4")] : []));
+    teamsMock.mockResolvedValue("Man City");
+
+    const result = await predict.refreshFixtures();
+    expect(result.predicted).toBe(0);
+  });
 });
 
 function fixture(id: string) {
