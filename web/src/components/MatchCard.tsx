@@ -4,6 +4,7 @@ import { CalendarDays, ChevronDown, Gauge, Target } from "lucide-react";
 import type { Fixture, Prediction } from "../api";
 import ProbabilityBar from "./ProbabilityBar";
 import ConfidenceBadge from "./ConfidenceBadge";
+import Markets from "./Markets";
 
 const PICK_LABEL: Record<string, string> = { H: "Local", D: "Empate", A: "Visita" };
 
@@ -89,6 +90,7 @@ export default function MatchCard({ fixture }: { fixture: Fixture }) {
         </div>
       </div>
       <ScoreHeatmap pred={pred} />
+      {pred.markets && <Markets markets={pred.markets} />}
     </div>
   );
 

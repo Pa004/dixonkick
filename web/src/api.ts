@@ -4,6 +4,72 @@ export interface League {
   hasModel: boolean;
 }
 
+export interface MarketProbs {
+  over: number;
+  under: number;
+}
+
+export interface TeamTotals {
+  home_over: number;
+  away_over: number;
+}
+
+export interface Handicap {
+  home_cover: number;
+}
+
+export interface CorrectScore {
+  home: number;
+  away: number;
+  prob: number;
+}
+
+export interface HtFtCell {
+  ht: "H" | "D" | "A";
+  ft: "H" | "D" | "A";
+  prob: number;
+}
+
+export interface CountMarkets {
+  total: Record<string, MarketProbs>;
+  team_totals: Record<string, TeamTotals>;
+  most: { home: number; draw: number; away: number };
+  handicap: Record<string, Handicap>;
+  expected: { home: number; away: number };
+}
+
+export interface FirstEvent {
+  home: number;
+  away: number;
+  none: number;
+}
+
+export interface Markets {
+  ft: {
+    double_chance: { "1X": number; "12": number; X2: number };
+    over_under: Record<string, MarketProbs>;
+    asian_handicap: Record<string, Handicap>;
+    odd_even: { odd: number; even: number };
+    team_totals: Record<string, TeamTotals>;
+    clean_sheet: { home: number; away: number };
+    correct_score_top: CorrectScore[];
+  };
+  ht: {
+    probabilities: { home: number; draw: number; away: number };
+    double_chance: { "1X": number; "12": number; X2: number };
+    over_under: Record<string, MarketProbs>;
+    btts_yes: number;
+    expected_goals: { home: number; away: number };
+  };
+  ht_ft: HtFtCell[];
+  corners: CountMarkets;
+  bookings: CountMarkets;
+  shots_on_target: CountMarkets;
+  fouls: CountMarkets;
+  first_goal: FirstEvent;
+  first_corner: FirstEvent;
+}
+
 export interface Prediction {
   probabilities: { home: number; draw: number; away: number };
   scoreline: { home: number; away: number; probability: number };
@@ -15,6 +81,7 @@ export interface Prediction {
   pick: "H" | "D" | "A";
   confidence: { level: string; label: string; probability: number };
   score_matrix?: number[][];
+  markets?: Markets;
 }
 
 export interface Fixture {
