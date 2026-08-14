@@ -22,7 +22,7 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from app.data import BOOKINGS_AWAY, BOOKINGS_HOME, EVENT_COLS, load_history
-from app.models.count_model import CountModel
+from app.models.count_model import CountModel, rolling_form
 from app.models.dixon_coles import DixonColes
 from app.models.markets import (
     asian_handicap,
@@ -101,16 +101,23 @@ def evaluate_ft(model: DixonColes, test: pd.DataFrame) -> None:
         pick("Local anota", {"si": pt["home_over"], "no": 1.0 - pt["home_over"]}, {"si"} if row.FTHG >= 1 else {"no"}, band)
 
 
-def evaluate_counts(models: dict[str, CountModel], test: pd.DataFrame) -> None:
+def evaluate_counts(models: dict[str, CountModel], test: pd.DataFrame, forms: dict) -> None:
     for market, model in models.items():
         hcol, acol = COUNT_COLS[market]
         line = COUNT_LINES[market]
+        rows, home_form, away_form = forms[market]
+        row_lookup = {(r.Date, r.HomeTeam, r.AwayTeam): i for i, r in enumerate(rows.itertuples(index=False))}
         for row in test.itertuples(index=False):
+            pos = row_lookup.get((row.Date, row.HomeTeam, row.AwayTeam))
+            if pos is None:
+                continue
             h, a = getattr(row, hcol), getattr(row, acol)
             if pd.isna(h) or pd.isna(a):
                 continue
             tot = float(h + a)
-            pred = model.predict(row.HomeTeam, row.AwayTeam)
+            pred = model.predict(
+                row.HomeTeam, row.AwayTeam, form_home=home_form[pos], form_away=away_form[pos]
+            )
             ou = total_markets_pmf(np.array(pred["pmf_home"]), np.array(pred["pmf_away"]), [line])[f"{line:g}"]
             pick(f"{market} total", {"over": ou["over"], "under": ou["under"]}, {"over"} if tot > line else {"under"}, "Incierto")
             most = most_markets(np.array(pred["pmf_home"]), np.array(pred["pmf_away"]))
@@ -128,12 +135,23 @@ def backtest(df: pd.DataFrame) -> None:
         dc.fit(train["Date"], train["HomeTeam"], train["AwayTeam"], train["FTHG"], train["FTAG"])
         evaluate_ft(dc, test)
         counts = {}
+        forms = {}
         for name, (hcol, acol) in COUNT_COLS.items():
-            rows = train.dropna(subset=[hcol, acol])
+            rows = df.dropna(subset=[hcol, acol]).sort_values("Date").reset_index(drop=True)
+            home_form, away_form, _ = rolling_form(
+                rows["Date"], rows["HomeTeam"], rows["AwayTeam"], rows[hcol], rows[acol]
+            )
+            forms[name] = (rows, home_form, away_form)
             m = CountModel()
-            m.fit(rows["Date"], rows["HomeTeam"], rows["AwayTeam"], rows[hcol], rows[acol])
+            m.fit(
+                rows["Date"][rows["Date"].dt.year < season],
+                rows["HomeTeam"][rows["Date"].dt.year < season],
+                rows["AwayTeam"][rows["Date"].dt.year < season],
+                rows[hcol][rows["Date"].dt.year < season],
+                rows[acol][rows["Date"].dt.year < season],
+            )
             counts[name] = m
-        evaluate_counts(counts, test)
+        evaluate_counts(counts, test, forms)
         print(f"  season {season}: picks={len(PICKS)}", flush=True)
 
 

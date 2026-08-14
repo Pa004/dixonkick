@@ -14,7 +14,7 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from app.data import BOOKINGS_AWAY, BOOKINGS_HOME, EVENT_COLS, load_history
-from app.models.count_model import CountModel
+from app.models.count_model import CountModel, rolling_form
 from app.models.dixon_coles import DixonColes
 
 TEST_SEASONS = [2023, 2024, 2025]
@@ -42,7 +42,11 @@ def rps_one(pred: np.ndarray, obs: int) -> float:
 def evaluate_counts(df: pd.DataFrame) -> None:
     """Walk-forward de los conteos: log-loss del total frente al baseline empirico."""
     for name, (hcol, acol) in COUNT_COLS.items():
-        rows = df.dropna(subset=[hcol, acol])
+        rows = df.dropna(subset=[hcol, acol]).sort_values("Date").reset_index(drop=True)
+        # Forma reciente disponible en cada momento (causal, sin mirar el futuro).
+        home_form, away_form, _ = rolling_form(
+            rows["Date"], rows["HomeTeam"], rows["AwayTeam"], rows[hcol], rows[acol]
+        )
         total_ll = 0.0
         base_ll = 0.0
         n = 0
@@ -62,11 +66,15 @@ def evaluate_counts(df: pd.DataFrame) -> None:
             train_total = (train[hcol] + train[acol]).to_numpy(dtype=int)
             n_bins = int(train_total.max()) + 1 if len(train_total) else 1
             base = (np.bincount(train_total, minlength=n_bins) + 1) / (len(train_total) + n_bins)
+            test_pos = test.index.to_numpy()
             season_ll = 0.0
             season_base = 0.0
             season_n = 0
-            for row in test.itertuples(index=False):
-                pred = model.predict(row.HomeTeam, row.AwayTeam)
+            for i, row in enumerate(test.itertuples(index=False)):
+                pos = test_pos[i]
+                pred = model.predict(
+                    row.HomeTeam, row.AwayTeam, form_home=home_form[pos], form_away=away_form[pos]
+                )
                 total = np.convolve(pred["pmf_home"], pred["pmf_away"])
                 obs = int(getattr(row, hcol) + getattr(row, acol))
                 if obs >= total.size or obs >= base.size:
