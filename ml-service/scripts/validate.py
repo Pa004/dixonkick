@@ -40,14 +40,17 @@ def rps_one(pred: np.ndarray, obs: int) -> float:
 
 
 def evaluate_counts(df: pd.DataFrame) -> None:
-    """Walk-forward de los conteos: log-loss de la distribucion del total."""
+    """Walk-forward de los conteos: log-loss del total frente al baseline empirico."""
     for name, (hcol, acol) in COUNT_COLS.items():
         rows = df.dropna(subset=[hcol, acol])
         total_ll = 0.0
+        base_ll = 0.0
         n = 0
         for season in TEST_SEASONS:
             train = rows[rows["Date"].dt.year < season]
             test = rows[rows["Date"].dt.year == season]
+            if len(test) == 0:
+                continue
             model = CountModel()
             model.fit(
                 train["Date"],
@@ -56,21 +59,37 @@ def evaluate_counts(df: pd.DataFrame) -> None:
                 train[hcol],
                 train[acol],
             )
+            train_total = (train[hcol] + train[acol]).to_numpy(dtype=int)
+            n_bins = int(train_total.max()) + 1 if len(train_total) else 1
+            base = (np.bincount(train_total, minlength=n_bins) + 1) / (len(train_total) + n_bins)
             season_ll = 0.0
+            season_base = 0.0
+            season_n = 0
             for row in test.itertuples(index=False):
                 pred = model.predict(row.HomeTeam, row.AwayTeam)
                 total = np.convolve(pred["pmf_home"], pred["pmf_away"])
                 obs = int(getattr(row, hcol) + getattr(row, acol))
-                if obs < total.size:
-                    season_ll += -np.log(np.clip(total[obs], 1e-12, None))
-                    n += 1
-            if len(test):
-                print(
-                    f"{name:15s} season {season}: log-loss total={season_ll / len(test):.4f} (n={len(test)})"
-                )
-                total_ll += season_ll
+                if obs >= total.size or obs >= base.size:
+                    continue
+                season_ll += -np.log(np.clip(total[obs], 1e-12, None))
+                season_base += -np.log(np.clip(base[obs], 1e-12, None))
+                season_n += 1
+            if season_n == 0:
+                continue
+            skill = 1 - season_ll / season_base
+            print(
+                f"{name:15s} season {season}: log-loss={season_ll / season_n:.4f}  "
+                f"baseline={season_base / season_n:.4f}  skill={skill:+.1%} (n={season_n})"
+            )
+            total_ll += season_ll
+            base_ll += season_base
+            n += season_n
         if n:
-            print(f"{name:15s} TOTAL: log-loss medio={total_ll / n:.4f} (n={n})")
+            skill = 1 - total_ll / base_ll
+            print(
+                f"{name:15s} TOTAL: log-loss={total_ll / n:.4f}  "
+                f"baseline={base_ll / n:.4f}  skill={skill:+.1%} (n={n})"
+            )
     print()
 
 
