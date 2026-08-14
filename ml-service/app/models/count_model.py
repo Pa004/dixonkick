@@ -41,6 +41,8 @@ def rolling_form(dates, home_team, away_team, home_count, away_count, k: int = F
     previo quedan en 0 (la media global centrada).
     """
     dates = np.asarray(dates)
+    home_team = np.asarray(home_team)
+    away_team = np.asarray(away_team)
     home_count = np.asarray(home_count, dtype=float)
     away_count = np.asarray(away_count, dtype=float)
     order = np.argsort(dates, kind="stable")
