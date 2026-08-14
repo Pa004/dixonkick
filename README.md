@@ -1,76 +1,193 @@
 # FutbolTipster
 
-Predicciones 1X2 de fútbol con un modelo estadístico Dixon-Coles (1997). Sin apuestas: muestra probabilidades y bandas de confianza como referencia.
+Predicciones 1X2 y mercados derivados de fútbol con modelos estadísticos (Dixon-Coles y Negativo-Binomial). Sin apuestas: muestra probabilidades y bandas de confianza como referencia.
 
 ## Arquitectura
 
 Monorepo de tres servicios:
 
-| Servicio | Tecnología | Puerto | Ruta |
-|----------|------------|--------|------|
-| `ml-service` | Python / FastAPI | 8001 | `/predict`, `/teams`, `/health` |
-| `server` | Node / Express + SQLite | 4000 | `/api/*` (orquesta ESPN, predicciones y tracking) |
-| `web` | React 19 / Vite / Tailwind v4 | 5173 | SPA |
+| Servicio | Tecnología | Puerto | Responsabilidad |
+|----------|------------|--------|-----------------|
+| `ml-service` | Python / FastAPI | 8001 | Modelos estadísticos y mercados (`/predict`, `/teams`, `/health`, `/models`) |
+| `server` | Node / Express + SQLite | 4000 | Orquesta ESPN, resuelve equipos, pide predicciones, persiste y hace tracking (`/api/*`) |
+| `web` | React 19 / Vite / Tailwind v4 | 5173 | SPA que solo lee `/api` |
 
-Flujo: el server consume la API de ESPN, resuelve los nombres de equipos contra el modelo (`teams.ts`), pide predicciones al ml-service y persiste fixtures/picks en SQLite (`server/data/futbol.db`). El web solo lee `/api`.
+Flujo: el server consume la API de ESPN, resuelve los nombres de equipos contra el modelo (`server/src/teams.ts`), pide la predicción al ml-service y persiste fixtures/picks en SQLite (`server/data/futbol.db`). El web consume `/api` (en dev vía proxy de Vite).
 
-## Requisitos
+## Modelos
 
-- Node.js >= 22 (usa `node:sqlite` y `fetch` nativo)
-- Python >= 3.11
-- npm
+Todos se entrenan sobre históricos de football-data.co.uk (5 ligas europeas, 2014-2025) con decaimiento temporal (partidos recientes pesan más).
+
+- **Dixon-Coles FT** (`app/models/dixon_coles.py`): Poisson bivariado con corrección tau para marcadores bajos. Estima ataque, defensa, ventaja local y rho por MLE. Genera la matriz de marcadores 9x9 (la UI dibuja 6x6).
+- **Dixon-Coles HT**: mismo modelo para el marcador de la primera mitad.
+- **Condicional empírica HT/FT** (`app/models/markets.py: ht_ft_markets`): P(FT | HT) 3x3 ponderada por decaimiento, combinada con las marginales de HT.
+- **Negativo-Binomial por conteo** (`app/models/count_model.py`): un modelo por mercado de conteo — corners, bookings, tiros a puerta y faltas — con sobredispersión global y **forma reciente** (media móvil de los últimos 5 partidos de cada equipo, centrada respecto a la media del mercado). Bookings sigue la regla SBOBET (amarilla=1, roja=2).
+
+Todos los modelos guardan artefactos en `ml-service/artifacts/` (`*.npz`) que el ml-service carga al arrancar.
+
+## Mercados
+
+El endpoint `/predict` devuelve, además del 1X2 base (probabilidades, marcador más probable, over/under 2.5, BTTS, goles esperados, pick y banda de confianza):
+
+- **FT**: doble oportunidad, over/under (0.5-4.5), hándicap asiático (-1.5 a +1.5), par/impar, totales por equipo (0.5-2.5), clean sheet, top de marcadores exactos.
+- **Primera mitad**: probabilidades 1X2, doble oportunidad, over/under 0.5 y 1.5, BTTS y HT/FT (9 combinaciones).
+- **Conteos** (corners, bookings, tiros, faltas): total por línea, total por equipo, más (home/draw/away) y hándicap.
+- **Primer gol / primer córner**: por Poisson independiente homogéneo.
+
+Aproximaciones documentadas en `app/models/markets.py`: primer evento asume procesos de Poisson independientes y "más X" usa independencia entre marginales.
+
+## Datos y entrenamiento
+
+El flujo completo es: descargar → entrenar → validar → backtest.
+
+```bash
+cd ml-service
+pip install -r requirements.txt
+
+# 1) Descargar históricos (football-data.co.uk vía proxy; bloqueado en la red local)
+python scripts/download_data.py        # genera CSVs en ml-service/data/ (2014-2025, 5 ligas)
+
+# 2) Entrenar todos los modelos
+python scripts/train.py                # genera artifacts/: dixon_coles, dixon_coles_ht,
+                                       #   htft_cond y corners/bookings/shots_on_target/fouls
+
+# 3) Validar con walk-forward (log-loss, RPS, accuracy, calibración por banda, skill)
+python scripts/validate.py
+
+# 4) Backtest de rentabilidad de los mercados
+python scripts/backtest.py
+```
+
+Nota: `ml-service/data/` y `ml-service/artifacts/` están en `.gitignore`; se regeneran con los comandos anteriores.
+
+## Validación
+
+Walk-forward: para cada temporada de test (2023-2025) se entrena solo con los partidos anteriores y se evalúa out-of-sample (n≈5373).
+
+**Dixon-Coles FT:**
+
+| Temporada | Log-loss | RPS | Accuracy |
+|-----------|----------|-----|----------|
+| 2023 | 1.002 | 0.206 | 51.2% |
+| 2024 | 0.985 | 0.198 | 52.7% |
+| 2025 | 0.993 | 0.206 | 51.8% |
+
+**Modelos de conteo (skill vs baseline empírico):**
+
+| Mercado | Skill |
+|---------|-------|
+| faltas | +2.6% |
+| tiros a puerta | +0.4% |
+| corners | -0.2% |
+| bookings | -1.2% |
+
+Un ensamble con XGBoost se probó y se descartó por no superar el umbral de mejora. La forma reciente se mantuvo por mejorar ligeramente faltas y no regresar el resto (su peso aprendido es casi nulo).
+
+## Backtest de rentabilidad
+
+Simula apuestas flat de 1 unidad en el pick de mayor probabilidad de cada mercado, con cuotas sintéticas estilo SBOBET (`odds = 1 / (p * (1 + margen))`). Reporta ROI con margen 0% (edge puro del modelo) y 7% (escenario realista de mercado). Walk-forward idéntico a la validación, n≈5372.
+
+| Mercado | hit | ROI 0% | ROI 7% |
+|---------|-----|--------|--------|
+| FT 1X2 | 0.519 | -1.79% | -8.22% |
+| Doble oportunidad | 0.777 | -1.61% | -8.05% |
+| Over/Under 2.5 | 0.570 | -4.02% | -10.30% |
+| Par/Impar | 0.513 | -1.12% | -7.59% |
+| Hándicap -0.5 | 0.651 | -0.13% | -6.66% |
+| **Local anota** | 0.772 | **+3.65%** | -3.13% |
+| corners total | 0.608 | -4.04% | -10.31% |
+| corners más | 0.585 | -4.67% | -10.91% |
+| bookings total | 0.570 | -7.92% | -13.94% |
+| bookings más | 0.456 | -8.03% | -14.05% |
+| tiros total | 0.617 | -4.39% | -10.64% |
+| tiros más | 0.620 | -2.04% | -8.45% |
+| faltas total | 0.614 | -6.55% | -12.66% |
+| faltas más | 0.568 | -3.67% | -9.97% |
+
+**Conclusión:** ninguno de los 14 mercados bate el margen del 7%; solo "Local anota" es positivo a margen 0% (+3.65%), insuficiente contra el impuesto de la casa. Los mercados derivados son **informativos, no consejos de apuesta**. La calibración por banda tampoco separa rentabilidad (ROI plano entre bandas).
+
+## Historial de trabajo
+
+Hitos principales y qué se arregló:
+
+- **Mercados múltiples (G1-G4)**: añadió modelos de conteo (corners, bookings, tiros, faltas) con Negativo-Binomial, Dixon-Coles de primera mitad, condicional empírica HT/FT y ~20 mercados derivados puros en `app/models/markets.py`. El web los muestra en el detalle del partido.
+- **Validación**: baseline empírico y skill para los conteos, además de log-loss/RPS/accuracy/calibración del FT.
+- **Backtest**: rentabilidad de los 14 mercados con cuotas sintéticas SBOBET. Corrigió bugs de asentamiento (el "más X" de conteos se asentaba con goles en vez de los conteos; doble oportunidad usaba un solo ganador en vez del conjunto; línea de hándicap 0.5→-0.5).
+- **Forma reciente**: covariable de media móvil (k=5) por equipo en los modelos de conteo. Corrigió la indexación de la forma al entrenar (acceso posicional vs por etiqueta en `rolling_form`).
+- **Robustez del server**: re-predice fixtures guardados con formato de predicción viejo; protección de `/api/refresh` con token + rate-limit; CORS y cabeceras de seguridad; sync tolerante a fallos de ESPN y ml-service.
+- **Calidad**: eslint/prettier (web y server) y ruff (ml-service); tests con vitest y pytest; lock de dependencias Python.
 
 ## Puesta en marcha
 
+Requisitos: Node.js >= 22 (usa `node:sqlite` y `fetch` nativo), Python >= 3.11, npm.
+
 Orden de arranque: primero el modelo, luego el server, luego el web.
 
+### 1) ml-service (modelos)
+
 ```bash
-# 1) ml-service (modelo Dixon-Coles)
 cd ml-service
-pip install -r requirements.txt        # o desde el lock: pip install -r requirements.lock
-uvicorn app.api:app --port 8001
+pip install -r requirements.txt        # o el lock: pip install -r requirements.lock
+python scripts/train.py                # solo si faltan los artefactos (ml-service/artifacts/)
+uvicorn app.api:app --port 8001        # o: python -m uvicorn app.api:app --port 8001
+```
 
-# 2) server (Express + SQLite + ESPN)
+Health-check: `GET http://127.0.0.1:8001/health` → `{"status": "ok", ...}`.
+
+### 2) server (Express + SQLite + ESPN)
+
+```bash
 cd server
-cp ../.env.example .env                # ajusta PORT/ML_URL si hace falta
+cp ../.env.example .env                # ajusta PORT / ML_URL / REFRESH_TOKEN si hace falta
 npm install
-npm run dev
+npm run dev                            # desarrollo (tsx watch)
+npm start                              # producción (tsx)
+```
 
-# 3) web (frontend)
+El server hace health-check a `http://127.0.0.1:8001/health` al arrancar (reintenta 24 veces cada 5 s) y sincroniza fixtures vía cron a las 06:00.
+
+### 3) web (frontend)
+
+```bash
 cd web
 npm install
 npm run dev                            # http://localhost:5173 (proxy /api -> 4000)
 ```
 
-El server hace un health-check a `http://127.0.0.1:8001/health` al arrancar y reintenta hasta que el ml-service responda antes del primer sync.
+En producción:
 
-## Datos y modelo
-
-1. **Descargar históricos** (football-data.co.uk vía proxy, bloqueado en la red local):
-
-   ```bash
-   cd ml-service && python scripts/download_data.py
-   ```
-
-   Guarda CSVs por liga y temporada en `ml-service/data/` (2014-2025, 5 ligas europeas).
-
-2. **Entrenar** el modelo (un modelo global por ahora):
-
-   ```bash
-   python scripts/train.py     # genera artifacts/dixon_coles.npz
-   ```
-
-3. **Validar** con walk-forward (log-loss, RPS, accuracy, calibración por banda):
-
-   ```bash
-   python scripts/validate.py
-   ```
-
-Resultados de referencia (3 temporadas out-of-sample 2023-2025): log-loss ~0.99, RPS ~0.20, accuracy ~52%, calibración Seguro ~74% real vs 72% predicho. Un ensamble con XGBoost se probó y se descartó por no superar el umbral de mejora (ver `scripts/validate.py`).
+```bash
+cd web
+npm run build                          # genera dist/
+npm run preview                        # sirve el build localmente
+```
 
 ## Variables de entorno
 
-Ver `.env.example` (raíz) y `web/.env.example`. En producción, el web necesita `VITE_API_URL` apuntando al server si no usa proxy.
+Ver `.env.example` (raíz) y `web/.env.example`.
+
+- `PORT` (server, default 4000), `ML_URL` (default `http://127.0.0.1:8001`)
+- `DB_PATH` (ruta de la DB; default `server/data/futbol.db`)
+- `REFRESH_TOKEN`: token requerido por `POST /api/refresh`. Genera uno con:
+  `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
+- `CORS_ORIGINS`: origenes permitidos separados por coma (vacío = todos, para dev)
+- `VITE_API_URL` (web): en producción apunta al server; en dev no hace falta (proxy de Vite)
+
+## API
+
+Server (`/api`, puerto 4000):
+
+- `GET /api/leagues` — ligas y si tienen modelo
+- `GET /api/fixtures?league=XX` — fixtures con predicción y detalle (matriz de marcador, goles esperados, over 2.5, BTTS, mercados)
+- `GET /api/stats` — precisión total y por banda de confianza
+- `POST /api/refresh` — fuerza sync (requiere `REFRESH_TOKEN`)
+
+ml-service (puerto 8001):
+
+- `POST /predict` — predicción completa de un par de equipos: 1X2, HT, HT/FT, mercados de conteo, primer gol/córner
+- `GET /teams` — equipos del modelo
+- `GET /health` — estado y nº de equipos
+- `GET /models` — qué modelos hay cargados (ft, ht, ht_ft_conditional, counts)
 
 ## Calidad
 
@@ -85,19 +202,11 @@ cd server && npm run lint && npm test && npm run typecheck
 cd ml-service && python -m ruff check app tests scripts && python -m ruff format --check . && python -m pytest tests -q
 ```
 
-- Tests: vitest (web y server) y pytest (ml-service). El lock de dependencias de Python está en `ml-service/requirements.lock` (generado con `pip freeze`).
-
-## API
-
-- `GET /api/leagues` — ligas y si tienen modelo
-- `GET /api/fixtures?league=XX` — fixtures con predicción y detalle (matriz de marcador, goles esperados, over 2.5, BTTS)
-- `GET /api/stats` — precisión total y por banda de confianza
-- `POST /api/refresh` — fuerza sync (requiere `REFRESH_TOKEN`)
-- `POST /predict` (ml-service) — predicción 1X2 de un par de equipos
-- `GET /health` (ml-service) — estado del modelo
+Tests: vitest (web y server), pytest (ml-service). El lock de dependencias Python está en `ml-service/requirements.lock` (generado con `pip freeze`).
 
 ## Límites
 
 - Solo 5 ligas tienen modelo (E0, SP1, I1, D1, F1). Liga Pro (EC1) se muestra sin predicción.
 - Las bandas de confianza son referencia, no certeza: los modelos de fútbol aciertan ~50-55% de los resultados.
 - Los equipos de la Liga Pro no están en el modelo; el server no genera predicción para esa liga.
+- Ningún mercado bate el margen de la casa en el backtest: la app es informativa, no un sistema de apuestas.
