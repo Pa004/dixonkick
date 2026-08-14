@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { ChevronDown, Gauge } from "lucide-react";
+import { AnimatePresence, m, useReducedMotion } from "motion/react";
+import { CalendarDays, ChevronDown, Gauge, Target } from "lucide-react";
 import type { Fixture, Prediction } from "../api";
 import ProbabilityBar from "./ProbabilityBar";
 import ConfidenceBadge from "./ConfidenceBadge";
@@ -56,22 +57,56 @@ function ScoreHeatmap({ pred }: { pred: Prediction }) {
 
 export default function MatchCard({ fixture }: { fixture: Fixture }) {
   const [open, setOpen] = useState(false);
+  const shouldReduce = useReducedMotion();
   const pred = fixture.prediction;
   const d = new Date(fixture.date);
   const dateStr = d.toLocaleDateString("es-EC", { weekday: "short", day: "2-digit", month: "short" });
   const timeStr = d.toLocaleTimeString("es-EC", { hour: "2-digit", minute: "2-digit" });
 
+  const detail = pred && (
+    <div id={`detail-${fixture.id}`} className="border-t border-neutro-800/60 p-5 pt-4">
+      <div className="mb-3 flex flex-wrap gap-x-6 gap-y-1 text-xs text-neutro-400">
+        <div>
+          Goles esperados:{" "}
+          <b className="font-display tabular-nums text-neutro-100">{pred.expected_goals.home.toFixed(2)}</b>{" "}
+          vs{" "}
+          <b className="font-display tabular-nums text-neutro-100">{pred.expected_goals.away.toFixed(2)}</b>
+        </div>
+        <div>
+          BTTS Sí:{" "}
+          <b className="font-display tabular-nums text-neutro-100">{Math.round(pred.btts_yes * 100)}%</b>
+        </div>
+        <div>
+          BTTS No:{" "}
+          <b className="font-display tabular-nums text-neutro-100">{Math.round(pred.btts_no * 100)}%</b>
+        </div>
+        <div className="flex items-center gap-1 text-neutro-400">
+          <ChevronDown
+            className={`h-3.5 w-3.5 transition-transform duration-200 motion-reduce:transition-none ${open ? "rotate-180" : ""}`}
+            aria-hidden="true"
+          />
+          Matriz de marcador
+        </div>
+      </div>
+      <ScoreHeatmap pred={pred} />
+    </div>
+  );
+
   return (
-    <div className="rounded-base bg-neutro-900 shadow-card transition-shadow duration-200 hover:shadow-elevated">
+    <div className="rounded-base bg-neutro-900 shadow-card transition-shadow duration-200 hover:shadow-glow">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        aria-label={`Partido ${fixture.home} contra ${fixture.away}`}
-        className="flex w-full flex-col gap-3 rounded-base p-5 text-left transition-colors hover:bg-neutro-850/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento-400"
         aria-expanded={open}
+        aria-controls={pred ? `detail-${fixture.id}` : undefined}
+        className="flex w-full flex-col gap-3 rounded-base p-5 text-left transition-colors hover:bg-neutro-850/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento-400"
       >
+        <span className="sr-only">
+          Partido {fixture.home} contra {fixture.away}
+        </span>
         <div className="flex items-center justify-between text-xs text-neutro-400">
-          <span className="uppercase tracking-wide">
+          <span className="inline-flex items-center gap-1.5 uppercase tracking-wide">
+            <CalendarDays className="h-3.5 w-3.5" aria-hidden="true" />
             {dateStr} · {timeStr}
           </span>
           <span className="font-semibold text-neutro-400">{fixture.league}</span>
@@ -112,7 +147,8 @@ export default function MatchCard({ fixture }: { fixture: Fixture }) {
                     {pred.scoreline.home}-{pred.scoreline.away}
                   </b>
                 </span>
-                <span>
+                <span className="inline-flex items-center gap-1">
+                  <Target className="h-3.5 w-3.5" aria-hidden="true" />
                   Favorito: <b className="text-neutro-100">{PICK_LABEL[pred.pick]}</b>
                 </span>
                 <span>
@@ -135,38 +171,22 @@ export default function MatchCard({ fixture }: { fixture: Fixture }) {
         )}
       </button>
 
-      {open && pred && (
-        <div className="border-t border-neutro-800/60 p-5 pt-4">
-          <div className="mb-3 flex flex-wrap gap-x-6 gap-y-1 text-xs text-neutro-400">
-            <div>
-              Goles esperados:{" "}
-              <b className="font-display tabular-nums text-neutro-100">
-                {pred.expected_goals.home.toFixed(2)}
-              </b>{" "}
-              vs{" "}
-              <b className="font-display tabular-nums text-neutro-100">
-                {pred.expected_goals.away.toFixed(2)}
-              </b>
-            </div>
-            <div>
-              BTTS Sí:{" "}
-              <b className="font-display tabular-nums text-neutro-100">{Math.round(pred.btts_yes * 100)}%</b>
-            </div>
-            <div>
-              BTTS No:{" "}
-              <b className="font-display tabular-nums text-neutro-100">{Math.round(pred.btts_no * 100)}%</b>
-            </div>
-            <div className="flex items-center gap-1 text-neutro-400">
-              <ChevronDown
-                className={`h-3.5 w-3.5 transition-transform duration-200 motion-reduce:transition-none ${open ? "rotate-180" : ""}`}
-                aria-hidden="true"
-              />
-              Matriz de marcador
-            </div>
-          </div>
-          <ScoreHeatmap pred={pred} />
-        </div>
-      )}
+      {shouldReduce && open && detail}
+
+      <AnimatePresence initial={false}>
+        {!shouldReduce && open && detail && (
+          <m.div
+            key="detail"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.25, ease: "easeOut" }}
+            className="overflow-hidden"
+          >
+            {detail}
+          </m.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
