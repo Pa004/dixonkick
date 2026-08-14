@@ -10,18 +10,19 @@ vi.mock("../teams.js", () => ({
 
 import { fetchLeagueFixtures } from "../providers/espn.js";
 import { resolveTeam } from "../teams.js";
-import { LEAGUES } from "../config.js";
 
 const espnMock = vi.mocked(fetchLeagueFixtures);
 const teamsMock = vi.mocked(resolveTeam);
 
 let predict: typeof import("../services/predict.js");
 let db: DatabaseSync;
+let LEAGUES: { espn: string; label: string; model: string | null }[];
 
 beforeAll(async () => {
   process.env.DB_PATH = ":memory:";
   predict = await import("../services/predict.js");
   ({ db } = await import("../db.js"));
+  LEAGUES = Object.values((await import("../config.js")).LEAGUES);
 });
 
 afterEach(() => {
@@ -121,7 +122,7 @@ describe("runSync", () => {
     const [r1, r2] = await Promise.all([first, second]);
 
     expect(r2).toEqual({ inserted: 0, predicted: 0, checked: 0 });
-    expect(espnCalls).toBe(Object.keys(LEAGUES).length);
+    expect(espnCalls).toBe(LEAGUES.length);
     expect(r1.inserted).toBeGreaterThanOrEqual(0);
   });
 });
