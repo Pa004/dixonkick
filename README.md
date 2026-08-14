@@ -204,6 +204,65 @@ cd ml-service && python -m ruff check app tests scripts && python -m ruff format
 
 Tests: vitest (web y server), pytest (ml-service). El lock de dependencias Python está en `ml-service/requirements.lock` (generado con `pip freeze`).
 
+## Roadmap
+
+- **Paso 5 — Recalibración por banda** (media prioridad, **solo si se monetiza**): el ROI plano entre bandas no justifica el esfuerzo ahora. Decisión abierta: retomar cuando el proyecto genere ingresos.
+- **Paso 6 — G5 goleador** (fase aparte): requiere spec propia antes de implementar.
+- **Paso 7 — Operación / docs + CI**: automatizar la re-predicción tras reentrenar (hoy las predicciones guardadas en DB no se refrescan), automatizar el refresh con token, y añadir CI (lint + tests en los 3 servicios).
+- **Paso 8 — Deploy**: servir `web/dist` desde el server y publicar los 3 servicios.
+
+## Notas de desarrollo
+
+**Gotchas operativos:**
+
+- `hasMarkets` en `server/src/services/predict.ts` solo re-predice fixtures sin mercados guardados. Si se reentrena el modelo, las predicciones ya persistidas en SQLite **no se actualizan** (ni `/api/refresh` las regenera).
+- `python scripts/download_data.py` está bloqueado en la red local (football-data.co.uk requiere proxy). Los CSVs de `ml-service/data/` ya descargados están gitignored.
+- `rolling_form` en `count_model.py` indexa por posición: al entrenar hay que pasar arrays (`np.asarray`) o un DataFrame con índice reseteado — `train.py` hace `dropna` sin `reset_index` y falla con `KeyError`.
+
+**Ejemplo de API (ml-service en 8001):**
+
+```bash
+curl -X POST http://127.0.0.1:8001/predict \
+  -H "Content-Type: application/json" \
+  -d '{"home": "Arsenal", "away": "Chelsea"}'
+```
+
+Respuesta (resumen): `probabilities` (home/draw/away), `scoreline` más probable, `over_25`/`under_25`, `btts_yes`/`btts_no`, `expected_goals`, `pick` (H/D/A), `confidence` (banda), `score_matrix` 6x6 y `markets` con FT, HT, HT/FT, conteos y primer gol/córner.
+
+**Mapa del monorepo:**
+
+```
+ml-service/
+  app/
+    api.py                  # FastAPI: /predict, /teams, /health, /models
+    data.py                 # carga de CSVs de football-data.co.uk
+    models/
+      dixon_coles.py        # Dixon-Coles FT y HT
+      count_model.py        # Negativo-Binomial + forma reciente
+      markets.py            # derivación de ~20 mercados
+  scripts/
+    download_data.py        # descarga de históricos (requiere proxy)
+    train.py                # entrena todo y guarda artifacts/*.npz
+    validate.py             # walk-forward + baseline + skill
+    backtest.py             # ROI por mercado y por banda
+  tests/                    # pytest (21 tests)
+  data/, artifacts/         # gitignored; se regeneran con train.py
+server/
+  src/
+    index.ts                # Express, health-check y cron de sync (06:00)
+    config.ts               # env (PORT, ML_URL, DB_PATH, REFRESH_TOKEN, CORS_ORIGINS)
+    db.ts                   # SQLite (node:sqlite): fixtures, picks, stats
+    teams.ts                # resuelve nombres ESPN -> modelo
+    providers/espn.ts       # cliente de la API de ESPN
+    routes/api.ts           # /api/leagues, /api/fixtures, /api/stats, /api/refresh
+    services/predict.ts     # orquesta predicción, hasMarkets, backfill
+web/
+  src/
+    App.tsx, main.tsx, api.ts
+    bands.ts                # umbrales y etiquetas de confianza
+    components/             # MatchCard, Markets, ProbabilityBar, ConfidenceBadge
+```
+
 ## Límites
 
 - Solo 5 ligas tienen modelo (E0, SP1, I1, D1, F1). Liga Pro (EC1) se muestra sin predicción.
