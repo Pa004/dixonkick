@@ -4,21 +4,44 @@ import express from "express";
 import cron from "node-cron";
 
 import { CORS_ORIGINS, ML_URL, PORT, SYNC_CRON } from "./config.js";
+import { db } from "./db.js";
 import { api } from "./routes/api.js";
 import { runSync } from "./services/predict.js";
 
 const app = express();
 
-// Cabeceras de seguridad mínimas (sin dependencias extra)
-app.use((_req, res, next) => {
+// El deploy termina detrás de un proxy TLS; confiar un salto permite req.ip y req.secure reales
+app.set("trust proxy", 1);
+
+// Cabeceras de seguridad (sin dependencias extra)
+app.use((req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
   res.setHeader("Referrer-Policy", "no-referrer");
+  res.setHeader(
+    "Content-Security-Policy",
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'",
+  );
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=(), interest-cohort=()");
+  if (req.secure) {
+    res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  }
   next();
 });
 
-app.use(cors({ origin: CORS_ORIGINS.length ? CORS_ORIGINS : true }));
-app.use(express.json());
+// CORS fail-closed: sin CORS_ORIGINS explícito se niega todo origen cruzado
+app.use(cors({ origin: CORS_ORIGINS.length ? CORS_ORIGINS : false }));
+app.use(express.json({ limit: "1kb" }));
+
+app.get("/health", (_req, res) => {
+  try {
+    db.prepare("SELECT 1").get();
+    res.json({ status: "ok" });
+  } catch {
+    res.status(503).json({ status: "error" });
+  }
+});
+
 app.use("/api", api);
 
 async function waitForMl(retries = 24, delayMs = 5000): Promise<void> {

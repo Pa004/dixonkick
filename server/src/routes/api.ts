@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import { Router } from "express";
 import { getBands } from "../bands.js";
 import { LEAGUES, REFRESH_TOKEN } from "../config.js";
@@ -10,6 +11,12 @@ function safeJson(raw: string): unknown {
   } catch {
     return null;
   }
+}
+
+function tokensEqual(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  return bufA.length === bufB.length && timingSafeEqual(bufA, bufB);
 }
 
 export const api = Router();
@@ -72,20 +79,25 @@ api.get("/stats", async (_req, res) => {
   });
 });
 
-// Rate limit en memoria para /refresh (evita DoS trivial)
-const refreshHits = new Map<string, { count: number; resetAt: number }>();
-const REFRESH_LIMIT = 5;
-const REFRESH_WINDOW_MS = 60_000;
+// Rate limit en memoria por IP y por token (evita DoS trivial sobre /refresh)
+const hits = new Map<string, { count: number; resetAt: number }>();
+const WINDOW_MS = 60_000;
 
-function rateLimited(key: string): boolean {
+function rateLimited(key: string, limit: number): boolean {
+  if (hits.size > 5000) {
+    const now = Date.now();
+    for (const [k, v] of hits) {
+      if (v.resetAt < now) hits.delete(k);
+    }
+  }
   const now = Date.now();
-  const entry = refreshHits.get(key);
+  const entry = hits.get(key);
   if (!entry || entry.resetAt < now) {
-    refreshHits.set(key, { count: 1, resetAt: now + REFRESH_WINDOW_MS });
+    hits.set(key, { count: 1, resetAt: now + WINDOW_MS });
     return false;
   }
   entry.count++;
-  return entry.count > REFRESH_LIMIT;
+  return entry.count > limit;
 }
 
 api.post("/refresh", (req, res) => {
@@ -93,15 +105,19 @@ api.post("/refresh", (req, res) => {
     res.status(503).json({ error: "REFRESH_TOKEN no configurado" });
     return;
   }
-  if (req.header("x-refresh-token") !== REFRESH_TOKEN) {
+  if (!tokensEqual(req.header("x-refresh-token") ?? "", REFRESH_TOKEN)) {
     res.status(401).json({ error: "token inválido" });
     return;
   }
-  if (rateLimited(REFRESH_TOKEN)) {
+  const ip = req.ip ?? req.socket.remoteAddress ?? "unknown";
+  if (rateLimited(`refresh-ip:${ip}`, 10) || rateLimited(`refresh-token:${REFRESH_TOKEN}`, 30)) {
     res.status(429).json({ error: "demasiadas solicitudes" });
     return;
   }
   runSync()
     .then((result) => res.json(result))
-    .catch((err) => res.status(502).json({ error: (err as Error).message }));
+    .catch((err) => {
+      console.error("[refresh]", (err as Error).message);
+      res.status(502).json({ error: "error de sincronización" });
+    });
 });
