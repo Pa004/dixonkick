@@ -3,7 +3,7 @@ import cors from "cors";
 import express from "express";
 import cron from "node-cron";
 
-import { CORS_ORIGINS, ML_URL, PORT } from "./config.js";
+import { CORS_ORIGINS, ML_URL, PORT, SYNC_CRON } from "./config.js";
 import { api } from "./routes/api.js";
 import { runSync } from "./services/predict.js";
 
@@ -46,7 +46,7 @@ async function tick() {
 
 async function main() {
   app.listen(PORT, () => console.log(`FutbolTipster server en http://localhost:${PORT}`));
-  cron.schedule("0 6 * * *", tick);
+  cron.schedule(SYNC_CRON, tick);
   await waitForMl();
   await tick();
 }

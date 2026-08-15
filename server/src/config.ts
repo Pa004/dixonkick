@@ -2,6 +2,7 @@ import { fileURLToPath } from "node:url";
 
 export const PORT = Number(process.env.PORT) || 4000;
 export const ML_URL = process.env.ML_URL || "http://127.0.0.1:8001";
+export const SYNC_CRON = process.env.SYNC_CRON || "0 6 * * *";
 
 export const LEAGUES: Record<string, { espn: string; label: string; model: string | null }> = {
   E0: { espn: "eng.1", label: "Premier League", model: "E0" },
