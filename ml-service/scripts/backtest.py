@@ -43,7 +43,12 @@ COUNT_COLS: dict[str, tuple[str, str]] = {
     "fouls": EVENT_COLS["fouls"],
 }
 # Lineas redondas de mercado para los totales de conteo.
-COUNT_LINES: dict[str, float] = {"corners": 10.5, "bookings": 4.5, "shots_on_target": 9.5, "fouls": 24.5}
+COUNT_LINES: dict[str, float] = {
+    "corners": 10.5,
+    "bookings": 4.5,
+    "shots_on_target": 9.5,
+    "fouls": 24.5,
+}
 
 BANDS = [
     ("Seguro", 0.65, 1.01),
@@ -92,13 +97,28 @@ def evaluate_ft(model: DixonColes, test: pd.DataFrame) -> None:
         dc_win = {"1X", "12"} if ft_win == "H" else {"1X", "X2"} if ft_win == "D" else {"12", "X2"}
         pick("Doble oportunidad", dc, dc_win, band)
         total_goals = float(row.FTHG + row.FTAG)
-        pick("Over/Under 2.5", {"over": pred["over_25"], "under": pred["under_25"]}, {"over"} if total_goals >= 3 else {"under"}, band)
+        pick(
+            "Over/Under 2.5",
+            {"over": pred["over_25"], "under": pred["under_25"]},
+            {"over"} if total_goals >= 3 else {"under"},
+            band,
+        )
         oe = odd_even(mat)
         pick("Par/Impar", oe, {"odd"} if total_goals % 2 == 1 else {"even"}, band)
         ah = asian_handicap(mat, [-0.5])["-0.5"]
-        pick("Hándicap -0.5", {"home": ah["home_cover"], "away": 1.0 - ah["home_cover"]}, {"home"} if row.FTHG > row.FTAG else {"away"}, band)
+        pick(
+            "Hándicap -0.5",
+            {"home": ah["home_cover"], "away": 1.0 - ah["home_cover"]},
+            {"home"} if row.FTHG > row.FTAG else {"away"},
+            band,
+        )
         pt = team_totals_pmf(mat.sum(axis=1), mat.sum(axis=0), [0.5])["0.5"]
-        pick("Local anota", {"si": pt["home_over"], "no": 1.0 - pt["home_over"]}, {"si"} if row.FTHG >= 1 else {"no"}, band)
+        pick(
+            "Local anota",
+            {"si": pt["home_over"], "no": 1.0 - pt["home_over"]},
+            {"si"} if row.FTHG >= 1 else {"no"},
+            band,
+        )
 
 
 def evaluate_counts(models: dict[str, CountModel], test: pd.DataFrame, forms: dict) -> None:
@@ -106,7 +126,9 @@ def evaluate_counts(models: dict[str, CountModel], test: pd.DataFrame, forms: di
         hcol, acol = COUNT_COLS[market]
         line = COUNT_LINES[market]
         rows, home_form, away_form = forms[market]
-        row_lookup = {(r.Date, r.HomeTeam, r.AwayTeam): i for i, r in enumerate(rows.itertuples(index=False))}
+        row_lookup = {
+            (r.Date, r.HomeTeam, r.AwayTeam): i for i, r in enumerate(rows.itertuples(index=False))
+        }
         for row in test.itertuples(index=False):
             pos = row_lookup.get((row.Date, row.HomeTeam, row.AwayTeam))
             if pos is None:
@@ -118,10 +140,22 @@ def evaluate_counts(models: dict[str, CountModel], test: pd.DataFrame, forms: di
             pred = model.predict(
                 row.HomeTeam, row.AwayTeam, form_home=home_form[pos], form_away=away_form[pos]
             )
-            ou = total_markets_pmf(np.array(pred["pmf_home"]), np.array(pred["pmf_away"]), [line])[f"{line:g}"]
-            pick(f"{market} total", {"over": ou["over"], "under": ou["under"]}, {"over"} if tot > line else {"under"}, "Incierto")
+            ou = total_markets_pmf(np.array(pred["pmf_home"]), np.array(pred["pmf_away"]), [line])[
+                f"{line:g}"
+            ]
+            pick(
+                f"{market} total",
+                {"over": ou["over"], "under": ou["under"]},
+                {"over"} if tot > line else {"under"},
+                "Incierto",
+            )
             most = most_markets(np.array(pred["pmf_home"]), np.array(pred["pmf_away"]))
-            pick(f"{market} más", {"home": most["home"], "away": most["away"], "draw": most["draw"]}, {"home"} if h > a else {"away"} if h < a else {"draw"}, "Incierto")
+            pick(
+                f"{market} más",
+                {"home": most["home"], "away": most["away"], "draw": most["draw"]},
+                {"home"} if h > a else {"away"} if h < a else {"draw"},
+                "Incierto",
+            )
 
 
 def backtest(df: pd.DataFrame) -> None:
@@ -161,7 +195,20 @@ def report() -> None:
         net = np.where(df["won"], 1.0 / (df["p"] * (1.0 + margin)) - 1.0, -1.0)
         df[f"net_{margin:.2f}"] = net
     print(f"\n--- Backtest walk-forward {TEST_SEASONS} (apuesta flat de 1u) ---")
-    print("  " + "mercad" + " " * 16 + "n" + " " * 6 + "hit" + " " * 7 + "p_med" + " " * 6 + "ROI 0%" + " " * 6 + "ROI 7%")
+    print(
+        "  "
+        + "mercad"
+        + " " * 16
+        + "n"
+        + " " * 6
+        + "hit"
+        + " " * 7
+        + "p_med"
+        + " " * 6
+        + "ROI 0%"
+        + " " * 6
+        + "ROI 7%"
+    )
     for market, group in df.groupby("market", sort=False):
         n = len(group)
         hit = group["won"].mean()
@@ -180,6 +227,8 @@ def report() -> None:
 
 if __name__ == "__main__":
     data = load_history()
-    print(f"Partidos: {len(data)} | Ligas: {data['League'].nunique()} | Equipos: {data['HomeTeam'].nunique()}")
+    print(
+        f"Partidos: {len(data)} | Ligas: {data['League'].nunique()} | Equipos: {data['HomeTeam'].nunique()}"
+    )
     backtest(data)
     report()

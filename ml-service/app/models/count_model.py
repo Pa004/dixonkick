@@ -69,7 +69,9 @@ def rolling_form(dates, home_team, away_team, home_count, away_count, k: int = F
 
 
 class CountModel:
-    def __init__(self, decay: float = DEFAULT_DECAY, max_count: int = MAX_COUNT, form_k: int = FORM_K) -> None:
+    def __init__(
+        self, decay: float = DEFAULT_DECAY, max_count: int = MAX_COUNT, form_k: int = FORM_K
+    ) -> None:
         self.decay = decay
         self.max_count = max_count
         self.form_k = form_k
@@ -118,8 +120,12 @@ class CountModel:
             mu, attack_free, defense_free, gamma, beta_form, alpha_od = unpack(p)
             att = np.concatenate([[0.0], attack_free])
             de = np.concatenate([[0.0], defense_free])
-            lam_h = np.exp(np.clip(mu + att[i_home] + de[i_away] + gamma + beta_form * home_form, -700, 700))
-            lam_a = np.exp(np.clip(mu + att[i_away] + de[i_home] + beta_form * away_form, -700, 700))
+            lam_h = np.exp(
+                np.clip(mu + att[i_home] + de[i_away] + gamma + beta_form * home_form, -700, 700)
+            )
+            lam_a = np.exp(
+                np.clip(mu + att[i_away] + de[i_home] + beta_form * away_form, -700, 700)
+            )
             r = 1.0 / alpha_od
             like_h = np.clip(nbinom.pmf(home_count, r, r / (r + lam_h)), 1e-12, None)
             like_a = np.clip(nbinom.pmf(away_count, r, r / (r + lam_a)), 1e-12, None)
@@ -157,8 +163,14 @@ class CountModel:
             return nll_val, grad
 
         base_rate = 0.5 * (float(np.mean(home_count)) + float(np.mean(away_count)))
-        p0 = np.concatenate([[np.log(max(base_rate, 1e-3))], np.zeros(2 * n_att), [0.2], [0.0], [0.2]])
-        bounds = [(None, None)] * (1 + 2 * n_att) + [(None, None), (None, None), (ALPHA_MIN, ALPHA_MAX)]
+        p0 = np.concatenate(
+            [[np.log(max(base_rate, 1e-3))], np.zeros(2 * n_att), [0.2], [0.0], [0.2]]
+        )
+        bounds = [(None, None)] * (1 + 2 * n_att) + [
+            (None, None),
+            (None, None),
+            (ALPHA_MIN, ALPHA_MAX),
+        ]
         res = minimize(
             nll_and_jac,
             p0,
@@ -172,7 +184,9 @@ class CountModel:
         self.attack = np.concatenate([[0.0], attack_free])
         self.defense = np.concatenate([[0.0], defense_free])
 
-    def predict(self, home: str, away: str, form_home: float | None = None, form_away: float | None = None) -> dict:
+    def predict(
+        self, home: str, away: str, form_home: float | None = None, form_away: float | None = None
+    ) -> dict:
         """Predice pmf. Si se dan form_home/form_away usa esos valores de forma
         reciente en vez de los almacenados en el entrenamiento (util en validacion)."""
         lam_h = self._lam(home, away, "home", form_home)
