@@ -205,6 +205,14 @@ cd server && npm run lint && npm test && npm run typecheck
 cd ml-service && python -m ruff check app tests scripts && python -m ruff format --check . && python -m pytest tests -q
 ```
 
+Smoke E2E del web (requiere el stack arriba: ml-service, server y el dev server del web):
+
+```bash
+cd web && npm run test:e2e
+```
+
+Usa `playwright-core` con el Chrome/Edge del sistema (sin descargar navegadores). Verifica en navegador real: tabs de ligas, tarjetas con predicción, expansión del detalle, sección de mercados y ausencia de errores de consola.
+
 Tests: vitest (web y server), pytest (ml-service). El lock de dependencias Python está en `ml-service/requirements.lock` (generado con `pip freeze`).
 
 ## Roadmap
