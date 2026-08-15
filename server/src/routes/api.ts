@@ -1,16 +1,8 @@
 import { Router } from "express";
+import { getBands } from "../bands.js";
 import { LEAGUES, REFRESH_TOKEN } from "../config.js";
 import { db } from "../db.js";
 import { runSync } from "../services/predict.js";
-
-// Espejo de CONFIDENCE_BANDS en ml-service/app/models/dixon_coles.py:
-// limite inferior inclusivo (>= lo AND < hi). Mantener en sincronía.
-const BANDS: [string, number, number][] = [
-  ["Seguro", 0.65, 1.01],
-  ["Probable", 0.55, 0.65],
-  ["Ajustado", 0.45, 0.55],
-  ["Incierto", 0, 0.45],
-];
 
 function safeJson(raw: string): unknown {
   try {
@@ -57,17 +49,18 @@ api.get("/fixtures", (req, res) => {
   );
 });
 
-api.get("/stats", (_req, res) => {
+api.get("/stats", async (_req, res) => {
   const totals = db.prepare("SELECT COUNT(*) n, SUM(hit) hits FROM tracked").get() as {
     n: number;
     hits: number;
   };
-  const bands = BANDS.map(([label, lo, hi]) => {
+  const bands = (await getBands()).map((b) => {
     const row = db
       .prepare("SELECT COUNT(*) n, SUM(hit) hits FROM tracked WHERE confidence >= ? AND confidence < ?")
-      .get(lo, hi) as { n: number; hits: number };
+      .get(b.lo, b.hi) as { n: number; hits: number };
     return {
-      band: label,
+      band: b.label,
+      level: b.level,
       count: row.n,
       accuracy: row.n > 0 ? row.hits / row.n : null,
     };
