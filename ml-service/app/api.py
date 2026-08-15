@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 from pathlib import Path
 
 import numpy as np
@@ -11,7 +12,7 @@ from pydantic import BaseModel
 
 from app.models import markets
 from app.models.count_model import CountModel
-from app.models.dixon_coles import DixonColes
+from app.models.dixon_coles import DixonColes, confidence_bands
 
 ARTIFACT_DIR = Path(__file__).resolve().parent.parent / "artifacts"
 
@@ -35,22 +36,40 @@ class Models:
         self.ht: DixonColes | None = None
         self.htft_cond: np.ndarray | None = None
         self.counts: dict[str, CountModel] = {}
+        self.trained_at: str | None = None
 
     def load(self) -> None:
+        saved: list[float] = []
         ft_path = ARTIFACT_DIR / "dixon_coles.npz"
         if ft_path.exists():
             self.ft = DixonColes.load(ft_path)
+            saved.append(_saved_at(ft_path))
         ht_path = ARTIFACT_DIR / "dixon_coles_ht.npz"
         if ht_path.exists():
             self.ht = DixonColes.load(ht_path)
+            saved.append(_saved_at(ht_path))
         for name in COUNT_GROUPS:
             path = ARTIFACT_DIR / f"{name}.npz"
             if path.exists():
                 self.counts[name] = CountModel.load(path)
+                saved.append(_saved_at(path))
         cond_path = ARTIFACT_DIR / "htft_cond.npz"
         if cond_path.exists():
             with np.load(cond_path) as data:
                 self.htft_cond = data["cond"]
+            saved.append(_saved_at(cond_path))
+        if saved:
+            newest = max(saved)
+            self.trained_at = datetime.fromtimestamp(newest, UTC).isoformat()
+
+
+def _saved_at(path: Path) -> float:
+    """Segundos desde epoch del saved_at del artefacto (0 si no lo trae)."""
+    with np.load(path) as data:
+        raw = data.get("saved_at")
+        if raw is None:
+            return 0.0
+        return float(np.datetime64(raw[0]).astype("datetime64[s]").astype("int64"))
 
 
 models = Models()
@@ -133,7 +152,11 @@ def build_prediction(home: str, away: str) -> dict:
 
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok", "teams": len(models.ft.teams) if models.ft else 0}
+    return {
+        "status": "ok",
+        "teams": len(models.ft.teams) if models.ft else 0,
+        "trained_at": models.trained_at,
+    }
 
 
 @app.get("/models")
@@ -143,7 +166,13 @@ def models_status() -> dict:
         "ht": models.ht is not None,
         "ht_ft_conditional": models.htft_cond is not None,
         "counts": {name: name in models.counts for name in COUNT_GROUPS},
+        "trained_at": models.trained_at,
     }
+
+
+@app.get("/bands")
+def bands() -> list[dict[str, float | str]]:
+    return confidence_bands()
 
 
 @app.get("/teams")
@@ -158,4 +187,8 @@ def predict(fixture: Fixture) -> dict:
     for team in (fixture.home, fixture.away):
         if team not in models.ft.idx:
             raise HTTPException(status_code=404, detail=f"equipo desconocido: {team}")
-    return {"home": fixture.home, "away": fixture.away, **build_prediction(fixture.home, fixture.away)}
+    return {
+        "home": fixture.home,
+        "away": fixture.away,
+        **build_prediction(fixture.home, fixture.away),
+    }

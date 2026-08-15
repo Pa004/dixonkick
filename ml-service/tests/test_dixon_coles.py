@@ -9,7 +9,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.models.dixon_coles import CONFIDENCE_BANDS, DixonColes, confidence_label
+from app.models.dixon_coles import CONFIDENCE_BANDS, DixonColes, confidence_bands, confidence_label
 
 TEAMS = ["Alfa", "Beta", "Gamma", "Delta"]
 N = 400
@@ -46,6 +46,30 @@ def test_confidence_label_boundaries():
     assert confidence_label(0.45)["level"] == "ajustado"
     assert confidence_label(0.3)["level"] == "incierto"
     assert [b[2] for b in CONFIDENCE_BANDS] == [0.65, 0.55, 0.45]
+
+
+def test_confidence_bands_ranges():
+    bands = confidence_bands()
+    by_level = {b["level"]: b for b in bands}
+    assert by_level["seguro"] == {"level": "seguro", "label": "Seguro", "lo": 0.65, "hi": 1.01}
+    assert by_level["probable"] == {
+        "level": "probable",
+        "label": "Probable",
+        "lo": 0.55,
+        "hi": 0.65,
+    }
+    assert by_level["ajustado"] == {
+        "level": "ajustado",
+        "label": "Ajustado",
+        "lo": 0.45,
+        "hi": 0.55,
+    }
+    assert by_level["incierto"] == {"level": "incierto", "label": "Incierto", "lo": 0.0, "hi": 0.45}
+    # las bandas cubren [0, 1.01) sin huecos ni solapes
+    ranges = sorted((b["lo"], b["hi"]) for b in bands)
+    assert ranges[0][0] == 0.0
+    for (_, hi), (lo2, _) in zip(ranges, ranges[1:], strict=False):
+        assert hi == lo2
 
 
 def test_predict_contract():

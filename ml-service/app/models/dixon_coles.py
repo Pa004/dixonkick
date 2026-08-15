@@ -18,13 +18,27 @@ DEFAULT_DECAY = 0.0025
 MAX_GOALS = 8
 HEATMAP_GOALS = 6  # la UI dibuja 6x6; el resto de la matriz se usa solo para cálculos
 
-# Umbrales de confianza (espejo de server/src/routes/api.ts BANDS): el pick cuyo
-# max(p_home, p_draw, p_away) >= umbral cae en esa banda, con límite inferior inclusivo.
+# Umbrales de confianza: el pick cuyo max(p_home, p_draw, p_away) >= umbral cae en
+# esa banda, con límite inferior inclusivo. Fuente de verdad; el server la consume
+# via GET /bands (confidence_bands()) y el web por nivel (lowercase).
 CONFIDENCE_BANDS = [
     ("seguro", "Seguro", 0.65),
     ("probable", "Probable", 0.55),
     ("ajustado", "Ajustado", 0.45),
 ]
+
+
+def confidence_bands() -> list[dict[str, float | str]]:
+    """Rangos explícitos de confianza (lo incluido, hi excluido) derivados de
+    CONFIDENCE_BANDS, incluida la banda de cola "incierto" [0, umbral mínimo).
+    El techo de la banda superior usa 1.01 para incluir p == 1.0."""
+    thresholds = sorted(b[2] for b in CONFIDENCE_BANDS)
+    bands: list[dict[str, float | str]] = []
+    for level, label, threshold in CONFIDENCE_BANDS:
+        upper = next((t for t in thresholds if t > threshold), 1.01)
+        bands.append({"level": level, "label": label, "lo": threshold, "hi": upper})
+    bands.append({"level": "incierto", "label": "Incierto", "lo": 0.0, "hi": thresholds[0]})
+    return bands
 
 
 class DixonColes:
