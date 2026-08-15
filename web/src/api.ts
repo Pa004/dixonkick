@@ -97,6 +97,7 @@ export interface Fixture {
   awayScore: number | null;
   prediction: Prediction | null;
   predictedAt: string | null;
+  skipReason: "no_model" | "team_not_in_model" | "predict_failed" | null;
 }
 
 export interface BandStat {

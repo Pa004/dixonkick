@@ -78,13 +78,16 @@ export async function refreshFixtures(
     for (const fx of fixtures) {
       const existing = db.prepare("SELECT home_model, prediction FROM fixtures WHERE id = ?").get(fx.id) as
         { home_model: string | null; prediction: string | null } | undefined;
+      // Liga sin modelo: se guarda la razón para que el web explique el estado
+      const skipReason = fx.status === "pre" && !league.model ? "no_model" : null;
       const upsert = db.prepare(`
         INSERT INTO fixtures
-          (id, league, date, home, away, home_short, away_short, status, home_score, away_score)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          (id, league, date, home, away, home_short, away_short, status, home_score, away_score, skip_reason)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
           date=excluded.date, status=excluded.status,
-          home_score=excluded.home_score, away_score=excluded.away_score
+          home_score=excluded.home_score, away_score=excluded.away_score,
+          skip_reason=excluded.skip_reason
       `);
       upsert.run(
         fx.id,
@@ -97,6 +100,7 @@ export async function refreshFixtures(
         fx.status,
         fx.homeScore,
         fx.awayScore,
+        skipReason,
       );
       inserted++;
 
@@ -112,19 +116,40 @@ export async function refreshFixtures(
     try {
       const homeModel = await resolveTeam(home);
       const awayModel = await resolveTeam(away);
-      if (!homeModel || !awayModel) return;
-      const pred = await predictFixture(homeModel, awayModel);
+      if (!homeModel || !awayModel) {
+        // el modelo no tiene datos de alguno de los equipos; sin reintentos que lo arreglen
+        db.prepare("UPDATE fixtures SET skip_reason='team_not_in_model' WHERE id=?").run(id);
+        return;
+      }
+      const pred = await predictWithRetry(homeModel, awayModel);
       db.prepare(
-        "UPDATE fixtures SET home_model=?, away_model=?, prediction=?, predicted_at=datetime('now') WHERE id=?",
+        "UPDATE fixtures SET home_model=?, away_model=?, prediction=?, skip_reason=NULL, predicted_at=datetime('now') WHERE id=?",
       ).run(homeModel, awayModel, JSON.stringify(pred), id);
       predicted++;
     } catch (err) {
-      // sin prediccion: se deja null, se reintenta en el proximo refresh
+      db.prepare("UPDATE fixtures SET skip_reason='predict_failed' WHERE id=?").run(id);
       console.error(`[sync] prediccion ${id} (${home} vs ${away}) falló: ${(err as Error).message}`);
     }
   });
 
+  const summary = db
+    .prepare("SELECT skip_reason, COUNT(*) n FROM fixtures WHERE status='pre' GROUP BY skip_reason")
+    .all() as { skip_reason: string | null; n: number }[];
+  console.log(
+    "[sync] estado prediccion:",
+    summary.map((s) => `${s.skip_reason ?? "predicha"}=${s.n}`).join(", "),
+  );
+
   return { inserted, predicted };
+}
+
+// Un reintento inmediato absorbe latencias transitorias del ml-service sin bloquear el sync
+async function predictWithRetry(home: string, away: string): Promise<object> {
+  try {
+    return await predictFixture(home, away);
+  } catch {
+    return predictFixture(home, away);
+  }
 }
 
 let syncing = false;

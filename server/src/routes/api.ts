@@ -52,6 +52,7 @@ api.get("/fixtures", (req, res) => {
       awayScore: r.away_score,
       prediction: r.prediction ? safeJson(r.prediction as string) : null,
       predictedAt: r.predicted_at,
+      skipReason: r.skip_reason ?? null,
     })),
   );
 });

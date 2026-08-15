@@ -34,8 +34,8 @@ afterEach(() => {
 
 function seedFixture(overrides: Record<string, string | number | null> = {}) {
   db.prepare(
-    `INSERT INTO fixtures (id, league, date, home, away, home_short, away_short, status, home_score, away_score, prediction)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO fixtures (id, league, date, home, away, home_short, away_short, status, home_score, away_score, prediction, skip_reason)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     overrides.id ?? "fx-1",
     overrides.league ?? "E0",
@@ -48,6 +48,7 @@ function seedFixture(overrides: Record<string, string | number | null> = {}) {
     overrides.home_score ?? null,
     overrides.away_score ?? null,
     overrides.prediction ?? null,
+    overrides.skip_reason ?? null,
   );
 }
 
@@ -264,6 +265,75 @@ describe("refreshFixtures", () => {
 
     const result = await predict.refreshFixtures();
     expect(result.predicted).toBe(0);
+  });
+
+  it("marca no_model para ligas sin modelo", async () => {
+    espnMock.mockImplementation(async (espnLeague) => (espnLeague === "ecu.1" ? [fixture("ecu-1")] : []));
+    teamsMock.mockResolvedValue("Man City");
+
+    const result = await predict.refreshFixtures();
+    expect(result.predicted).toBe(0);
+    const row = db.prepare("SELECT skip_reason FROM fixtures WHERE id='ecu-1'").get() as {
+      skip_reason: string | null;
+    };
+    expect(row.skip_reason).toBe("no_model");
+  });
+
+  it("marca team_not_in_model cuando un equipo no resuelve", async () => {
+    espnMock.mockImplementation(async (espnLeague) => (espnLeague === "eng.1" ? [fixture("epl-cup")] : []));
+    teamsMock.mockResolvedValue(null);
+
+    const result = await predict.refreshFixtures();
+    expect(result.predicted).toBe(0);
+    const row = db.prepare("SELECT skip_reason FROM fixtures WHERE id='epl-cup'").get() as {
+      skip_reason: string | null;
+    };
+    expect(row.skip_reason).toBe("team_not_in_model");
+  });
+
+  it("marca predict_failed tras reintentar cuando el modelo falla", async () => {
+    espnMock.mockImplementation(async (espnLeague) => (espnLeague === "eng.1" ? [fixture("epl-err")] : []));
+    teamsMock.mockResolvedValue("Man City");
+    let predictCalls = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        predictCalls++;
+        return new Response("boom", { status: 500 });
+      }),
+    );
+
+    const result = await predict.refreshFixtures();
+    expect(result.predicted).toBe(0);
+    expect(predictCalls).toBe(2);
+    const row = db.prepare("SELECT skip_reason FROM fixtures WHERE id='epl-err'").get() as {
+      skip_reason: string | null;
+    };
+    expect(row.skip_reason).toBe("predict_failed");
+  });
+
+  it("borra skip_reason al conseguir la predicción", async () => {
+    seedFixture({ id: "epl-ok", skip_reason: "predict_failed" });
+    espnMock.mockImplementation(async (espnLeague) => (espnLeague === "eng.1" ? [fixture("epl-ok")] : []));
+    teamsMock.mockResolvedValue("Man City");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ pick: "H", confidence: { probability: 0.7 }, markets: { ft: {} } }), {
+            status: 200,
+          }),
+      ),
+    );
+
+    const result = await predict.refreshFixtures();
+    expect(result.predicted).toBe(1);
+    const row = db.prepare("SELECT skip_reason, prediction FROM fixtures WHERE id='epl-ok'").get() as {
+      skip_reason: string | null;
+      prediction: string;
+    };
+    expect(row.skip_reason).toBeNull();
+    expect(row.prediction).toBeTruthy();
   });
 });
 

@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS fixtures (
   away_model TEXT,
   predicted_at TEXT,
   prediction TEXT,
+  skip_reason TEXT,
   result_checked INTEGER DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_fixtures_league_date ON fixtures(league, date);
@@ -39,3 +40,9 @@ CREATE TABLE IF NOT EXISTS meta (
   value TEXT NOT NULL
 );
 `);
+
+// Migraciones para bases existentes (CREATE TABLE IF NOT EXISTS no altera)
+const fixtureCols = db.prepare("PRAGMA table_info(fixtures)").all() as { name: string }[];
+if (!fixtureCols.some((c) => c.name === "skip_reason")) {
+  db.exec("ALTER TABLE fixtures ADD COLUMN skip_reason TEXT");
+}

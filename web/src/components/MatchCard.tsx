@@ -8,6 +8,12 @@ import Markets from "./Markets";
 
 const PICK_LABEL: Record<string, string> = { H: "Local", D: "Empate", A: "Visita" };
 
+const SKIP_LABEL: Record<string, string> = {
+  no_model: "Liga sin modelo de datos todavía",
+  team_not_in_model: "Equipo sin datos en el modelo",
+  predict_failed: "Predicción falló; se reintentará en el próximo sync",
+};
+
 function heatColor(p: number): string {
   if (p < 0.03) return "bg-neutro-850 text-neutro-500";
   if (p < 0.08) return "bg-neutro-800 text-neutro-400";
@@ -166,9 +172,7 @@ export default function MatchCard({ fixture }: { fixture: Fixture }) {
         ) : (
           <div className="flex items-center justify-center gap-2 rounded-base bg-neutro-850 py-2 text-xs text-neutro-400">
             <Gauge className="h-4 w-4" aria-hidden="true" />
-            {fixture.league === "EC1"
-              ? "Liga sin modelo de datos todavía"
-              : "Sin datos suficientes para predecir este duelo"}
+            {SKIP_LABEL[fixture.skipReason ?? ""] ?? "Sin datos suficientes para predecir este duelo"}
           </div>
         )}
       </button>
