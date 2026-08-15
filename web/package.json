@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:e2e": "node e2e/smoke.mjs",
     "lint": "eslint src --max-warnings 0",
     "format": "prettier --write src eslint.config.js"
   },
