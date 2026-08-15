@@ -24,6 +24,11 @@ jobs:
         run: python -m ruff format --check .
       - name: Tests
         run: python -m pytest tests -q
+      - name: Auditoría de dependencias (pip-audit)
+        continue-on-error: true
+        run: |
+          pip install pip-audit
+          python -m pip_audit -r requirements.lock
 
   server:
     runs-on: ubuntu-latest
@@ -41,6 +46,9 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
+      - name: Auditoría de dependencias (npm audit)
+        continue-on-error: true
+        run: npm audit --audit-level=high
 
   web:
     runs-on: ubuntu-latest
@@ -58,3 +66,6 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
+      - name: Auditoría de dependencias (npm audit)
+        continue-on-error: true
+        run: npm audit --audit-level=high
