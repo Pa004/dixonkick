@@ -13,6 +13,32 @@ function hasMarkets(prediction: string | null | undefined): boolean {
   }
 }
 
+const META_TRAINED_AT = "ml_trained_at";
+
+async function fetchModelTrainedAt(): Promise<string | null> {
+  try {
+    const res = await fetch(`${ML_URL}/health`, { signal: AbortSignal.timeout(5000) });
+    if (!res.ok) throw new Error(`ml-service /health: ${res.status}`);
+    const data = (await res.json()) as { trained_at?: string | null };
+    return data.trained_at ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function getMeta(key: string): string | null {
+  const row = db.prepare("SELECT value FROM meta WHERE key = ?").get(key) as
+    | { value: string }
+    | undefined;
+  return row?.value ?? null;
+}
+
+function setMeta(key: string, value: string): void {
+  db.prepare(
+    "INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+  ).run(key, value);
+}
+
 export async function predictFixture(home: string, away: string): Promise<object> {
   const res = await fetch(`${ML_URL}/predict`, {
     method: "POST",
@@ -35,7 +61,9 @@ async function mapLimit<T>(items: T[], limit: number, fn: (item: T) => Promise<v
   await Promise.all(workers);
 }
 
-export async function refreshFixtures(): Promise<{ inserted: number; predicted: number }> {
+export async function refreshFixtures(
+  force = false,
+): Promise<{ inserted: number; predicted: number }> {
   let inserted = 0;
   const tasks: { id: string; home: string; away: string }[] = [];
 
@@ -72,7 +100,8 @@ export async function refreshFixtures(): Promise<{ inserted: number; predicted: 
       );
       inserted++;
 
-      if (fx.status === "pre" && league.model && !hasMarkets(existing?.prediction)) {
+      // force = modelo reentrenado: re-predice aunque la predicción ya tenga markets
+      if (fx.status === "pre" && league.model && (force || !hasMarkets(existing?.prediction))) {
         tasks.push({ id: fx.id, home: fx.home, away: fx.away });
       }
     }
@@ -104,7 +133,12 @@ export async function runSync(): Promise<{ inserted: number; predicted: number; 
   if (syncing) return { inserted: 0, predicted: 0, checked: 0 };
   syncing = true;
   try {
-    const { inserted, predicted } = await refreshFixtures();
+    const trainedAt = await fetchModelTrainedAt();
+    // Si el modelo se reentrenó, las predicciones guardadas quedan obsoletas:
+    // forzar re-predicción de todos los partidos pendientes.
+    const force = trainedAt != null && trainedAt !== getMeta(META_TRAINED_AT);
+    const { inserted, predicted } = await refreshFixtures(force);
+    if (trainedAt != null) setMeta(META_TRAINED_AT, trainedAt);
     const checked = checkResults();
     return { inserted, predicted, checked };
   } finally {
