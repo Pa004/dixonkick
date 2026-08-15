@@ -130,9 +130,9 @@ export default function Markets({ markets }: { markets: MarketsData }) {
   const { ft, ht, ht_ft, corners, bookings, shots_on_target, fouls, first_goal, first_corner } = markets;
   return (
     <div className="mt-4 rounded-base border border-neutro-800/60 bg-neutro-950/40 p-3">
-      <h3 className="mb-1 font-display text-xs font-semibold uppercase tracking-wide text-neutro-300">
+      <h2 className="mb-1 font-display text-xs font-semibold uppercase tracking-wide text-neutro-300">
         Mercados
-      </h3>
+      </h2>
 
       <Section title="Resultado">
         <Row
@@ -213,7 +213,7 @@ export default function Markets({ markets }: { markets: MarketsData }) {
             {ht_ft.map((cell) => (
               <div
                 key={`${cell.ht}-${cell.ft}`}
-                className="rounded bg-neutro-800/50 px-1 py-0.5 text-center text-[11px] tabular-nums"
+                className="rounded bg-neutro-800/50 px-1 py-0.5 text-center text-xs tabular-nums"
               >
                 <span className="text-neutro-400">
                   {cell.ht}/{cell.ft}

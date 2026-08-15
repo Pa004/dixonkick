@@ -163,7 +163,7 @@ export default function App() {
                   }`}
                 >
                   {l.label}
-                  {!l.hasModel && <span className="ml-1.5 text-[10px]">sin modelo</span>}
+                  {!l.hasModel && <span className="ml-1.5 text-xs text-neutro-500">sin modelo</span>}
                 </button>
               ))}
             </div>
@@ -192,7 +192,9 @@ export default function App() {
                   ) : error ? (
                     <div className="flex flex-col items-center gap-4 py-16 text-center">
                       <ShieldAlert className="h-8 w-8 text-visita-400" aria-hidden="true" />
-                      <p className="max-w-md text-sm text-neutro-400">{error}</p>
+                      <p role="alert" className="max-w-md text-sm text-neutro-400">
+                        {error}
+                      </p>
                       <button
                         type="button"
                         onClick={load}
@@ -224,7 +226,7 @@ export default function App() {
               </AnimatePresence>
             </div>
 
-            <p className="mt-8 text-center text-[11px] leading-relaxed text-neutro-500">
+            <p className="mt-8 text-center text-xs leading-relaxed text-neutro-500">
               Los modelos de fútbol aciertan ~50-55% de los resultados: usa las bandas de confianza como
               referencia, no como certeza. Datos: ESPN · Modelo Dixon-Coles entrenado con resultados 2014-2025
               (football-data.co.uk).

@@ -1,13 +1,14 @@
+// Escala de intensidad (no de color): más intenso = más confianza, sin semántica de apuestas
 export const BAND_COLORS: Record<string, string> = {
-  seguro: "bg-acento-500/15 text-acento-300 ring-acento-500/40",
-  probable: "bg-neutro-300/15 text-neutro-200 ring-neutro-300/40",
-  ajustado: "bg-neutro-400/15 text-neutro-300 ring-neutro-400/40",
-  incierto: "bg-neutro-500/15 text-neutro-300 ring-neutro-500/40",
+  seguro: "bg-acento-500/20 text-acento-200 ring-acento-400/40",
+  probable: "bg-acento-500/10 text-acento-300 ring-acento-500/30",
+  ajustado: "bg-acento-600/10 text-acento-500 ring-acento-600/25",
+  incierto: "bg-neutro-500/10 text-neutro-400 ring-neutro-500/30",
 };
 
 export const BAND_DOT: Record<string, string> = {
   seguro: "bg-acento-400",
-  probable: "bg-neutro-200",
-  ajustado: "bg-neutro-300",
-  incierto: "bg-neutro-400",
+  probable: "bg-acento-500",
+  ajustado: "bg-acento-600",
+  incierto: "bg-neutro-500",
 };

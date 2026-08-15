@@ -9,8 +9,8 @@ import Markets from "./Markets";
 const PICK_LABEL: Record<string, string> = { H: "Local", D: "Empate", A: "Visita" };
 
 function heatColor(p: number): string {
-  if (p < 0.03) return "bg-neutro-900 text-neutro-400";
-  if (p < 0.08) return "bg-neutro-850 text-neutro-400";
+  if (p < 0.03) return "bg-neutro-850 text-neutro-500";
+  if (p < 0.08) return "bg-neutro-800 text-neutro-400";
   if (p < 0.15) return "bg-acento-950 text-acento-300";
   return "bg-acento-400 text-neutro-950";
 }
@@ -21,7 +21,7 @@ function ScoreHeatmap({ pred }: { pred: Prediction }) {
   const size = 6;
   return (
     <div className="overflow-x-auto">
-      <table className="mx-auto border-separate border-spacing-0.5 text-center text-[11px]">
+      <table className="mx-auto border-separate border-spacing-0.5 text-center text-xs">
         <thead>
           <tr>
             <th scope="col" className="pr-2 text-right font-normal text-neutro-500">

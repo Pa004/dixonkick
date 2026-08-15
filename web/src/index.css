@@ -1,9 +1,9 @@
-@import url("https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Inter:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Geist:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Inter", system-ui, sans-serif;
-  --font-display: "Sora", "Inter", sans-serif;
+  --font-sans: "Geist", system-ui, sans-serif;
+  --font-display: "Sora", "Geist", sans-serif;
 
   --color-acento-50: oklch(0.985 0.008 170);
   --color-acento-100: oklch(0.965 0.02 170);
