@@ -116,6 +116,7 @@ Hitos principales y qué se arregló:
 - **Forma reciente**: covariable de media móvil (k=5) por equipo en los modelos de conteo. Corrigió la indexación de la forma al entrenar (acceso posicional vs por etiqueta en `rolling_form`).
 - **Robustez del server**: re-predice fixtures guardados con formato de predicción viejo; protección de `/api/refresh` con token + rate-limit; CORS y cabeceras de seguridad; sync tolerante a fallos de ESPN y ml-service.
 - **Calidad**: eslint/prettier (web y server) y ruff (ml-service); tests con vitest y pytest; lock de dependencias Python.
+- **Operación (Paso 7)**: re-predicción automática al reentrenar (el server compara `trained_at` del modelo y fuerza re-predicción de los partidos pendientes); cron de sync configurable (`SYNC_CRON`); CI en GitHub Actions (lint + tests en los 3 servicios). Las bandas de confianza pasan a tener una única fuente de verdad (`GET /bands` en el ml-service) y la UI degrada con elegancia si falta un modelo de mercado.
 
 ## Puesta en marcha
 
@@ -167,6 +168,7 @@ npm run preview                        # sirve el build localmente
 Ver `.env.example` (raíz) y `web/.env.example`.
 
 - `PORT` (server, default 4000), `ML_URL` (default `http://127.0.0.1:8001`)
+- `SYNC_CRON` (server): horario del cron de sincronización en formato node-cron (default `0 6 * * *`)
 - `DB_PATH` (ruta de la DB; default `server/data/futbol.db`)
 - `REFRESH_TOKEN`: token requerido por `POST /api/refresh`. Genera uno con:
   `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
@@ -186,8 +188,9 @@ ml-service (puerto 8001):
 
 - `POST /predict` — predicción completa de un par de equipos: 1X2, HT, HT/FT, mercados de conteo, primer gol/córner
 - `GET /teams` — equipos del modelo
-- `GET /health` — estado y nº de equipos
+- `GET /health` — estado, nº de equipos y `trained_at` (timestamp del último entrenamiento)
 - `GET /models` — qué modelos hay cargados (ft, ht, ht_ft_conditional, counts)
+- `GET /bands` — bandas de confianza con rangos explícitos (`level`, `label`, `lo`, `hi`); fuente de verdad del server
 
 ## Calidad
 
@@ -208,16 +211,14 @@ Tests: vitest (web y server), pytest (ml-service). El lock de dependencias Pytho
 
 - **Paso 5 — Recalibración por banda** (media prioridad, **solo si se monetiza**): el ROI plano entre bandas no justifica el esfuerzo ahora. Decisión abierta: retomar cuando el proyecto genere ingresos.
 - **Paso 6 — G5 goleador** (fase aparte): requiere spec propia antes de implementar.
-- **Paso 7 — Operación / docs + CI**: automatizar la re-predicción tras reentrenar (hoy las predicciones guardadas en DB no se refrescan), automatizar el refresh con token, y añadir CI (lint + tests en los 3 servicios).
 - **Paso 8 — Deploy**: servir `web/dist` desde el server y publicar los 3 servicios.
 
 ## Notas de desarrollo
 
 **Gotchas operativos:**
 
-- `hasMarkets` en `server/src/services/predict.ts` solo re-predice fixtures sin mercados guardados. Si se reentrena el modelo, las predicciones ya persistidas en SQLite **no se actualizan** (ni `/api/refresh` las regenera).
 - `python scripts/download_data.py` está bloqueado en la red local (football-data.co.uk requiere proxy). Los CSVs de `ml-service/data/` ya descargados están gitignored.
-- `rolling_form` en `count_model.py` indexa por posición: al entrenar hay que pasar arrays (`np.asarray`) o un DataFrame con índice reseteado — `train.py` hace `dropna` sin `reset_index` y falla con `KeyError`.
+- Las bandas de confianza las define el ml-service (`GET /bands`); el server las cachea y usa un fallback en `server/src/bands.ts` si el modelo no responde.
 
 **Ejemplo de API (ml-service en 8001):**
 
@@ -249,13 +250,14 @@ ml-service/
   data/, artifacts/         # gitignored; se regeneran con train.py
 server/
   src/
-    index.ts                # Express, health-check y cron de sync (06:00)
-    config.ts               # env (PORT, ML_URL, DB_PATH, REFRESH_TOKEN, CORS_ORIGINS)
-    db.ts                   # SQLite (node:sqlite): fixtures, picks, stats
+    index.ts                # Express, health-check y cron de sync (SYNC_CRON, default 06:00)
+    config.ts               # env (PORT, ML_URL, SYNC_CRON, DB_PATH, REFRESH_TOKEN, CORS_ORIGINS)
+    db.ts                   # SQLite (node:sqlite): fixtures, picks, stats, meta
+    bands.ts                # bandas de confianza (GET /bands del modelo + fallback)
     teams.ts                # resuelve nombres ESPN -> modelo
     providers/espn.ts       # cliente de la API de ESPN
     routes/api.ts           # /api/leagues, /api/fixtures, /api/stats, /api/refresh
-    services/predict.ts     # orquesta predicción, hasMarkets, backfill
+    services/predict.ts     # orquesta predicción, hasMarkets, backfill, re-predicción por trained_at
 web/
   src/
     App.tsx, main.tsx, api.ts
