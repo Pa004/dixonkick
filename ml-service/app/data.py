@@ -45,10 +45,13 @@ BOOKINGS_HOME = "BookingsH"
 BOOKINGS_AWAY = "BookingsA"
 
 
-def load_history(leagues: dict[str, str] | None = None) -> pd.DataFrame:
+def load_history(
+    leagues: dict[str, str] | None = None, data_dir: Path | None = None
+) -> pd.DataFrame:
     leagues = leagues or LEAGUES
+    data_dir = data_dir or DATA_DIR
     frames = []
-    for file in sorted(DATA_DIR.glob("*.csv")):
+    for file in sorted(data_dir.glob("*.csv")):
         league_code = file.stem[:-4]
         if league_code not in leagues:
             continue
