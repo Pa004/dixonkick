@@ -178,72 +178,78 @@ export default function Markets({ markets }: { markets: MarketsData }) {
         ))}
       </Section>
 
-      <Section title="Primera mitad">
-        <Row
-          label="1X2"
-          values={[
-            { name: "Local", value: ht.probabilities.home },
-            { name: "Empate", value: ht.probabilities.draw },
-            { name: "Visita", value: ht.probabilities.away },
-          ]}
-        />
-        <Row
-          label="Doble oportunidad"
-          values={[
-            { name: "1X", value: ht.double_chance["1X"] },
-            { name: "12", value: ht.double_chance["12"] },
-            { name: "X2", value: ht.double_chance.X2 },
-          ]}
-        />
-        <OverUnderRows lines={ht.over_under} />
-        <Row
-          label="BTTS 1ª mitad"
-          values={[
-            { name: "Sí", value: ht.btts_yes },
-            { name: "No", value: 1 - ht.btts_yes },
-          ]}
-        />
-      </Section>
+      {ht && (
+        <Section title="Primera mitad">
+          <Row
+            label="1X2"
+            values={[
+              { name: "Local", value: ht.probabilities.home },
+              { name: "Empate", value: ht.probabilities.draw },
+              { name: "Visita", value: ht.probabilities.away },
+            ]}
+          />
+          <Row
+            label="Doble oportunidad"
+            values={[
+              { name: "1X", value: ht.double_chance["1X"] },
+              { name: "12", value: ht.double_chance["12"] },
+              { name: "X2", value: ht.double_chance.X2 },
+            ]}
+          />
+          <OverUnderRows lines={ht.over_under} />
+          <Row
+            label="BTTS 1ª mitad"
+            values={[
+              { name: "Sí", value: ht.btts_yes },
+              { name: "No", value: 1 - ht.btts_yes },
+            ]}
+          />
+        </Section>
+      )}
 
-      <Section title="HT/FT">
-        <div className="grid grid-cols-3 gap-1 py-1">
-          {ht_ft.map((cell) => (
-            <div
-              key={`${cell.ht}-${cell.ft}`}
-              className="rounded bg-neutro-800/50 px-1 py-0.5 text-center text-[11px] tabular-nums"
-            >
-              <span className="text-neutro-400">
-                {cell.ht}/{cell.ft}
-              </span>{" "}
-              <span className="text-neutro-100">{pct(cell.prob)}</span>
-            </div>
-          ))}
-        </div>
-      </Section>
+      {ht_ft && ht_ft.length > 0 && (
+        <Section title="HT/FT">
+          <div className="grid grid-cols-3 gap-1 py-1">
+            {ht_ft.map((cell) => (
+              <div
+                key={`${cell.ht}-${cell.ft}`}
+                className="rounded bg-neutro-800/50 px-1 py-0.5 text-center text-[11px] tabular-nums"
+              >
+                <span className="text-neutro-400">
+                  {cell.ht}/{cell.ft}
+                </span>{" "}
+                <span className="text-neutro-100">{pct(cell.prob)}</span>
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
 
-      <CountSection title="Córners" m={corners} />
-      <CountSection title="Tarjetas" m={bookings} />
-      <CountSection title="Tiros a puerta" m={shots_on_target} />
-      <CountSection title="Faltas" m={fouls} />
+      {corners && <CountSection title="Córners" m={corners} />}
+      {bookings && <CountSection title="Tarjetas" m={bookings} />}
+      {shots_on_target && <CountSection title="Tiros a puerta" m={shots_on_target} />}
+      {fouls && <CountSection title="Faltas" m={fouls} />}
 
-      <Section title="Primer evento">
-        <Row
-          label="Primer gol"
-          values={[
-            { name: "Local", value: first_goal.home },
-            { name: "Visita", value: first_goal.away },
-            { name: "Sin gol", value: first_goal.none },
-          ]}
-        />
-        <Row
-          label="Primer córner"
-          values={[
-            { name: "Local", value: first_corner.home },
-            { name: "Visita", value: first_corner.away },
-            { name: "Sin córner", value: first_corner.none },
-          ]}
-        />
-      </Section>
+      {first_goal && first_corner && (
+        <Section title="Primer evento">
+          <Row
+            label="Primer gol"
+            values={[
+              { name: "Local", value: first_goal.home },
+              { name: "Visita", value: first_goal.away },
+              { name: "Sin gol", value: first_goal.none },
+            ]}
+          />
+          <Row
+            label="Primer córner"
+            values={[
+              { name: "Local", value: first_corner.home },
+              { name: "Visita", value: first_corner.away },
+              { name: "Sin córner", value: first_corner.none },
+            ]}
+          />
+        </Section>
+      )}
     </div>
   );
 }

@@ -130,7 +130,7 @@ export default function App() {
                     >
                       <span
                         aria-hidden="true"
-                        className={`h-1.5 w-1.5 rounded-full ${BAND_DOT[b.band] ?? "bg-neutro-500"}`}
+                        className={`h-1.5 w-1.5 rounded-full ${BAND_DOT[b.level] ?? "bg-neutro-500"}`}
                       />
                       {b.band}:{" "}
                       <b className="font-display tabular-nums text-neutro-200">

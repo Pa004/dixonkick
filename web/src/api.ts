@@ -54,20 +54,20 @@ export interface Markets {
     clean_sheet: { home: number; away: number };
     correct_score_top: CorrectScore[];
   };
-  ht: {
+  ht?: {
     probabilities: { home: number; draw: number; away: number };
     double_chance: { "1X": number; "12": number; X2: number };
     over_under: Record<string, MarketProbs>;
     btts_yes: number;
     expected_goals: { home: number; away: number };
   };
-  ht_ft: HtFtCell[];
-  corners: CountMarkets;
-  bookings: CountMarkets;
-  shots_on_target: CountMarkets;
-  fouls: CountMarkets;
-  first_goal: FirstEvent;
-  first_corner: FirstEvent;
+  ht_ft?: HtFtCell[];
+  corners?: CountMarkets;
+  bookings?: CountMarkets;
+  shots_on_target?: CountMarkets;
+  fouls?: CountMarkets;
+  first_goal?: FirstEvent;
+  first_corner?: FirstEvent;
 }
 
 export interface Prediction {
@@ -101,6 +101,7 @@ export interface Fixture {
 
 export interface BandStat {
   band: string;
+  level: string;
   count: number;
   accuracy: number | null;
 }

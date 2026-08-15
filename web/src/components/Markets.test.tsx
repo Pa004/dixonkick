@@ -90,4 +90,23 @@ describe("Markets", () => {
     fireEvent.click(screen.getByRole("button", { name: "Resultado" }));
     expect(screen.getByText("1X 75%")).toHaveClass("font-semibold");
   });
+
+  it("degrada sin HT, HT/FT ni mercados de conteo", () => {
+    const ftOnly: MarketsData = {
+      ft: {
+        double_chance: { "1X": 0.7, "12": 0.6, X2: 0.5 },
+        over_under: { "2.5": { over: 0.43, under: 0.57 } },
+        asian_handicap: { "-0.5": { home_cover: 0.55 } },
+        odd_even: { odd: 0.5, even: 0.5 },
+        team_totals: { "1.5": { home_over: 0.6, away_over: 0.4 } },
+        clean_sheet: { home: 0.3, away: 0.25 },
+        correct_score_top: [{ home: 1, away: 0, prob: 0.12 }],
+      },
+    };
+    render(<Markets markets={ftOnly} />);
+    expect(screen.getByRole("heading", { name: "Mercados" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Primera mitad" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Córners" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Primer evento" })).not.toBeInTheDocument();
+  });
 });
