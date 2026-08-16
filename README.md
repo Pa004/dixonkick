@@ -58,6 +58,13 @@ python scripts/validate.py
 python scripts/backtest.py
 ```
 
+Liga Pro (EC1): se descarga el histórico de ESPN y se entrena un Dixon-Coles por liga (el global queda intacto):
+
+```bash
+python scripts/download_espn_ecuador.py   # genera data/EC1{year}.csv (2014-hoy)
+python scripts/train.py --league EC1     # genera artifacts/dixon_coles_ec1.npz
+```
+
 Nota: `ml-service/data/` y `ml-service/artifacts/` están en `.gitignore`; se regeneran con los comandos anteriores.
 
 ## Validación
@@ -188,9 +195,9 @@ Server (`/api`, puerto 4000):
 ml-service (puerto 8001):
 
 - `POST /predict` — predicción completa de un par de equipos: 1X2, HT, HT/FT, mercados de conteo, primer gol/córner
-- `GET /teams` — equipos del modelo
+- `GET /teams?league=EC1` — equipos del modelo de una liga (sin league: modelo global)
 - `GET /health` — estado, nº de equipos y `trained_at` (timestamp del último entrenamiento)
-- `GET /models` — qué modelos hay cargados (ft, ht, ht_ft_conditional, counts)
+- `GET /models` — qué modelos hay cargados (ft, ft_ec1, ht, ht_ft_conditional, counts)
 - `GET /bands` — bandas de confianza con rangos explícitos (`level`, `label`, `lo`, `hi`); fuente de verdad del server
 
 ## Calidad
@@ -279,7 +286,8 @@ web/
 
 ## Límites
 
-- Solo 5 ligas tienen modelo (E0, SP1, I1, D1, F1). Liga Pro (EC1) se muestra sin predicción.
+- Solo 5 ligas tienen el modelo global (E0, SP1, I1, D1, F1); Liga Pro (EC1) usa un modelo Dixon-Coles por liga entrenado con histórico de ESPN (`dixon_coles_ec1.npz`).
+- Liga Pro solo predice el marcador completo (FT): los mercados de conteo (corners, bookings, tiros, faltas) y el de primera mitad usan el baseline del modelo global.
+- Los equipos ascendidos de la Liga Pro recientes tienen parámetros débiles por poco histórico; el server marca `team_not_in_model` si no hay datos suficientes.
 - Las bandas de confianza son referencia, no certeza: los modelos de fútbol aciertan ~50-55% de los resultados.
-- Los equipos de la Liga Pro no están en el modelo; el server no genera predicción para esa liga.
 - Ningún mercado bate el margen de la casa en el backtest: la app es informativa, no un sistema de apuestas.
