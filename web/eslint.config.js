@@ -26,4 +26,11 @@ export default tseslint.config(
     },
   },
   prettier,
+  // Los componentes generados por shadcn/ui exportan variantes (cva) junto al componente
+  {
+    files: ["src/components/ui/**"],
+    rules: {
+      "react-refresh/only-export-components": "off",
+    },
+  },
 );
