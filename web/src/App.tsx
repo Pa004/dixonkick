@@ -147,7 +147,7 @@ export default function App() {
       <LazyMotion features={domAnimation}>
         <div className="min-h-screen">
           <header className="sticky top-0 z-10 border-b border-neutro-800/60 bg-neutro-950/80 backdrop-blur">
-            <div className="mx-auto flex max-w-3xl flex-col gap-4 px-4 py-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-5 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h1 className="flex items-center gap-2 font-display text-xl font-bold tracking-tight text-acento-400">
                   <Activity className="h-6 w-6" aria-hidden="true" /> FutbolTipster
@@ -177,168 +177,186 @@ export default function App() {
             </div>
           </header>
 
-          <main className="mx-auto max-w-3xl px-4 py-6">
-            {stats && stats.totalTracked > 0 && (
-              <>
-              <div className="mb-5 flex flex-wrap gap-3 rounded-base border border-neutro-800/60 bg-neutro-900/60 p-4 text-xs">
-                <div className="flex items-center gap-2 text-neutro-400">
-                  <TrendingUp className="h-4 w-4 text-acento-400" aria-hidden="true" />
-                  Precisión general:
-                  <b className="font-display text-sm font-bold tabular-nums text-acento-300">
-                    {Math.round((stats.overallAccuracy ?? 0) * 100)}%
-                  </b>
-                  <span className="text-neutro-500">({stats.totalTracked} partidos)</span>
-                </div>
-                {stats.bands
-                  .filter((b) => b.accuracy != null)
-                  .map((b) => (
-                    <span
-                      key={b.band}
-                      className="inline-flex items-center gap-1.5 rounded-full bg-neutro-800/70 px-2.5 py-1 text-neutro-400"
-                    >
-                      <span
-                        aria-hidden="true"
-                        className={`h-1.5 w-1.5 rounded-full ${BAND_DOT[b.level] ?? "bg-neutro-500"}`}
-                      />
-                      {b.band}:{" "}
-                      <b className="font-display tabular-nums text-neutro-200">
-                        {Math.round(b.accuracy! * 100)}%
-                      </b>
-                    </span>
-                  ))}
-              </div>
-              <BandLegend />
-              </>
-            )}
-
-            {topPicks.length > 0 && (
-              <section aria-label="Mejores picks de hoy" className="mb-6">
-                <h2 className="mb-3 flex items-center gap-2 font-display text-sm font-bold uppercase tracking-wide text-neutro-200">
-                  <Sparkles className="h-4 w-4 text-acento-400" aria-hidden="true" />
-                  Mejores picks de hoy
-                </h2>
-                <div className="flex flex-col gap-3">
-                  {topPicks.map((f, i) => (
-                    <SpotlightCard key={f.id}>
-                      <div className="flex items-center gap-3 rounded-base border border-neutro-800/60 bg-neutro-900/70 p-3">
-                        <span className="font-display text-lg font-bold tabular-nums text-acento-400">
-                          {i + 1}
+          <main className="mx-auto w-full max-w-7xl px-4 py-6">
+            <div className="lg:grid lg:grid-cols-[17rem_1fr] lg:items-start lg:gap-8">
+              <aside className="flex flex-col gap-6 lg:sticky lg:top-20">
+                {stats && stats.totalTracked > 0 && (
+                  <>
+                    <div className="rounded-base border border-neutro-800/60 bg-neutro-900/60 p-4 text-xs">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="inline-flex items-center gap-2 text-neutro-400">
+                          <TrendingUp className="h-4 w-4 text-acento-400" aria-hidden="true" />
+                          Precisión general
                         </span>
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate font-display text-sm font-semibold text-neutro-100">
-                            {f.home} vs {f.away}
-                          </p>
-                          <p className="mt-0.5 truncate text-xs text-neutro-400">{f.league}</p>
-                        </div>
-                        <ConfidenceBadge confidence={f.prediction!.confidence} />
+                        <b className="font-display text-lg font-bold tabular-nums text-acento-300">
+                          {Math.round((stats.overallAccuracy ?? 0) * 100)}%
+                        </b>
                       </div>
-                    </SpotlightCard>
-                  ))}
-                </div>
-              </section>
-            )}
+                      <p className="mt-0.5 text-neutro-500">({stats.totalTracked} partidos)</p>
+                      {stats.bands.filter((b) => b.accuracy != null).length > 0 && (
+                        <ul className="mt-3 flex flex-col gap-1.5 border-t border-neutro-800/60 pt-3">
+                          {stats.bands
+                            .filter((b) => b.accuracy != null)
+                            .map((b) => (
+                              <li
+                                key={b.band}
+                                className="flex items-center justify-between gap-2 text-neutro-400"
+                              >
+                                <span className="inline-flex items-center gap-1.5">
+                                  <span
+                                    aria-hidden="true"
+                                    className={`h-1.5 w-1.5 rounded-full ${BAND_DOT[b.level] ?? "bg-neutro-500"}`}
+                                  />
+                                  {b.band}
+                                </span>
+                                <b className="font-display tabular-nums text-neutro-200">
+                                  {Math.round(b.accuracy! * 100)}%
+                                </b>
+                              </li>
+                            ))}
+                        </ul>
+                      )}
+                    </div>
+                    <BandLegend />
+                  </>
+                )}
 
-            <div
-              role="tablist"
-              aria-label="Ligas"
-              onKeyDown={onTabKeyDown}
-              className="mb-5 flex gap-2 overflow-x-auto pb-1"
-            >
-              {leagues.map((l) => (
-                <button
-                  key={l.code}
-                  id={`tab-${l.code}`}
-                  type="button"
-                  role="tab"
-                  aria-selected={activeCode === l.code}
-                  aria-controls="panel-ligas"
-                  onClick={() => setActive(l.code)}
-                  className={`inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold transition-colors ${FOCUS} ${
-                    activeCode === l.code
-                      ? "bg-acento-400 text-neutro-950"
-                      : "bg-neutro-900 text-neutro-400 ring-1 ring-neutro-800 hover:text-neutro-200"
-                  }`}
+                {topPicks.length > 0 && (
+                  <section aria-label="Mejores picks de hoy">
+                    <h2 className="mb-3 flex items-center gap-2 font-display text-sm font-bold uppercase tracking-wide text-neutro-200">
+                      <Sparkles className="h-4 w-4 text-acento-400" aria-hidden="true" />
+                      Mejores picks de hoy
+                    </h2>
+                    <div className="flex flex-col gap-3">
+                      {topPicks.map((f, i) => (
+                        <SpotlightCard key={f.id}>
+                          <div className="flex items-center gap-3 rounded-base border border-neutro-800/60 bg-neutro-900/70 p-3">
+                            <span className="font-display text-lg font-bold tabular-nums text-acento-400">
+                              {i + 1}
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate font-display text-sm font-semibold text-neutro-100">
+                                {f.home} vs {f.away}
+                              </p>
+                              <p className="mt-0.5 truncate text-xs text-neutro-400">{f.league}</p>
+                            </div>
+                            <ConfidenceBadge confidence={f.prediction!.confidence} />
+                          </div>
+                        </SpotlightCard>
+                      ))}
+                    </div>
+                  </section>
+                )}
+              </aside>
+
+              <div className="min-w-0">
+                <div
+                  role="tablist"
+                  aria-label="Ligas"
+                  onKeyDown={onTabKeyDown}
+                  className="mb-5 flex gap-2 overflow-x-auto pb-1"
                 >
-                  {l.label}
-                  {!l.hasModel && <span className="text-neutro-500">sin modelo</span>}
-                  {(countByLeague.get(l.code) ?? 0) > 0 && (
-                    <span
-                      className={`rounded-full px-1.5 py-0.5 text-[10px] tabular-nums ${
-                        activeCode === l.code ? "bg-neutro-950/20 text-neutro-950" : "bg-neutro-800 text-neutro-300"
+                  {leagues.map((l) => (
+                    <button
+                      key={l.code}
+                      id={`tab-${l.code}`}
+                      type="button"
+                      role="tab"
+                      aria-selected={activeCode === l.code}
+                      aria-controls="panel-ligas"
+                      onClick={() => setActive(l.code)}
+                      className={`inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold transition-colors ${FOCUS} ${
+                        activeCode === l.code
+                          ? "bg-acento-400 text-neutro-950"
+                          : "bg-neutro-900 text-neutro-400 ring-1 ring-neutro-800 hover:text-neutro-200"
                       }`}
                     >
-                      {countByLeague.get(l.code)}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
+                      {l.label}
+                      {!l.hasModel && <span className="text-neutro-500">sin modelo</span>}
+                      {(countByLeague.get(l.code) ?? 0) > 0 && (
+                        <span
+                          className={`rounded-full px-1.5 py-0.5 text-[10px] tabular-nums ${
+                            activeCode === l.code ? "bg-neutro-950/20 text-neutro-950" : "bg-neutro-800 text-neutro-300"
+                          }`}
+                        >
+                          {countByLeague.get(l.code)}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
 
-            {!loading && !error && shown.length > 0 && (
-              <MatchToolbar
-                sort={sort}
-                onSort={setSort}
-                onlyPredicted={onlyPredicted}
-                onOnlyPredicted={setOnlyPredicted}
-              />
-            )}
+                {!loading && !error && shown.length > 0 && (
+                  <MatchToolbar
+                    sort={sort}
+                    onSort={setSort}
+                    onlyPredicted={onlyPredicted}
+                    onOnlyPredicted={setOnlyPredicted}
+                  />
+                )}
 
-            <div
-              id="panel-ligas"
-              role="tabpanel"
-              aria-labelledby={`tab-${activeCode}`}
-              aria-busy={loading}
-              className="min-h-40"
-            >
-              <AnimatePresence mode="wait">
-                <m.div
-                  key={stateKey}
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -4 }}
-                  transition={panelTransition}
+                <div
+                  id="panel-ligas"
+                  role="tabpanel"
+                  aria-labelledby={`tab-${activeCode}`}
+                  aria-busy={loading}
+                  className="min-h-40"
                 >
-                  {loading ? (
-                    <div role="status" aria-live="polite" className="flex flex-col gap-4">
-                      {Array.from({ length: 3 }, (_, i) => (
-                        <SkeletonCard key={i} />
-                      ))}
-                    </div>
-                  ) : error ? (
-                    <div className="flex flex-col items-center gap-4 py-16 text-center">
-                      <ShieldAlert className="h-8 w-8 text-visita-400" aria-hidden="true" />
-                      <p role="alert" className="max-w-md text-sm text-neutro-400">
-                        {error}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => load()}
-                        className={`min-h-11 rounded-base border border-neutro-700 px-4 py-2 text-xs font-semibold text-neutro-300 transition-colors hover:border-acento-500/60 hover:text-acento-300 ${FOCUS}`}
-                      >
-                        Reintentar
-                      </button>
-                    </div>
-                  ) : shown.length === 0 ? (
-                    <div className="flex flex-col items-center gap-2 py-16 text-neutro-500">
-                      <ShieldAlert className="h-8 w-8" aria-hidden="true" />
-                      <p className="text-sm">No hay partidos próximos en esta liga.</p>
-                    </div>
-                  ) : (
-                    <m.ul
-                      variants={listVariants}
-                      initial="hidden"
-                      animate="visible"
-                      className="flex flex-col gap-4"
+                  <AnimatePresence mode="wait">
+                    <m.div
+                      key={stateKey}
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -4 }}
+                      transition={panelTransition}
                     >
-                      {shown.map((f) => (
-                        <m.li key={f.id} variants={cardVariants}>
-                          <MatchCard fixture={f} />
-                        </m.li>
-                      ))}
-                    </m.ul>
-                  )}
-                </m.div>
-              </AnimatePresence>
+                      {loading ? (
+                        <div
+                          role="status"
+                          aria-live="polite"
+                          className="flex flex-col gap-4 xl:grid xl:grid-cols-2 xl:gap-4"
+                        >
+                          {Array.from({ length: 4 }, (_, i) => (
+                            <SkeletonCard key={i} />
+                          ))}
+                        </div>
+                      ) : error ? (
+                        <div className="flex flex-col items-center gap-4 py-16 text-center">
+                          <ShieldAlert className="h-8 w-8 text-visita-400" aria-hidden="true" />
+                          <p role="alert" className="max-w-md text-sm text-neutro-400">
+                            {error}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => load()}
+                            className={`min-h-11 rounded-base border border-neutro-700 px-4 py-2 text-xs font-semibold text-neutro-300 transition-colors hover:border-acento-500/60 hover:text-acento-300 ${FOCUS}`}
+                          >
+                            Reintentar
+                          </button>
+                        </div>
+                      ) : shown.length === 0 ? (
+                        <div className="flex flex-col items-center gap-2 py-16 text-neutro-500">
+                          <ShieldAlert className="h-8 w-8" aria-hidden="true" />
+                          <p className="text-sm">No hay partidos próximos en esta liga.</p>
+                        </div>
+                      ) : (
+                        <m.ul
+                          variants={listVariants}
+                          initial="hidden"
+                          animate="visible"
+                          className="flex flex-col gap-4 xl:grid xl:grid-cols-2 xl:gap-4 xl:items-start"
+                        >
+                          {shown.map((f) => (
+                            <m.li key={f.id} variants={cardVariants}>
+                              <MatchCard fixture={f} />
+                            </m.li>
+                          ))}
+                        </m.ul>
+                      )}
+                    </m.div>
+                  </AnimatePresence>
+                </div>
+              </div>
             </div>
 
             <p className="mt-8 text-center text-xs leading-relaxed text-neutro-500">
