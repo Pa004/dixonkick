@@ -1,6 +1,8 @@
 import { useState, useId, type ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
 import type { CountMarkets, Markets as MarketsData, MarketProbs } from "../api";
+import Tooltip from "./Tooltip";
+import { cn } from "../utils";
 
 const pct = (v: number) => `${Math.round(v * 100)}%`;
 
@@ -9,21 +11,58 @@ interface Value {
   value: number;
 }
 
+// Explica mercados en lenguaje llano; refuerza el carácter informativo de la app
+const EXPLAIN: Record<string, string> = {
+  "Doble oportunidad": "Cubre dos de los tres resultados del 1X2: 1X (local o empate), 12 (sin empate) o X2 (visita o empate).",
+  "Over/Under": "Probabilidad de que el total de goles supere (Over) o no (Under) la línea indicada.",
+  Hándicap: "Ventaja o desventaja en goles aplicada al marcador antes de comparar quién gana.",
+  "Local +": "Goles del equipo local; Over supera la línea, Under se queda por debajo.",
+  "Visita +": "Goles del equipo visitante; Over supera la línea, Under se queda por debajo.",
+  "Par / Impar": "Probabilidad de que el total de goles del partido sea par o impar.",
+  "Local sin recibir": "El equipo local mantiene la portería a cero durante el partido.",
+  "Visita sin recibir": "El equipo visitante mantiene la portería a cero durante el partido.",
+  Más: "Resultado más probable del mercado de conteo (local, empate o visita).",
+  "Primer gol": "Quién marca primero; 'Sin gol' cubre el 0-0 final.",
+  "Primer córner": "Quién consigue el primer córner; 'Sin córner' es prácticamente nulo.",
+  "Marcadores exactos": "Los marcadores finales más probables, ordenados por probabilidad.",
+  BTTS: "Both Teams To Score: que ambos equipos marquen al menos un gol.",
+  "1X2": "Resultado final: local (1), empate (X) o visita (2).",
+};
+
 function Row({ label, values }: { label: string; values: Value[] }) {
   const best = Math.max(...values.map((v) => v.value));
   return (
-    <div className="flex items-center justify-between gap-2 border-b border-neutro-800/60 py-1.5 text-xs last:border-0">
-      <span className="text-neutro-400">{label}</span>
-      <span className="flex gap-3 tabular-nums">
+    <div className="flex flex-col gap-1.5 border-b border-neutro-800/60 py-2 text-xs last:border-0">
+      <div className="flex items-center justify-between gap-2">
+        <Tooltip label={EXPLAIN[label] ?? ""}>
+          <span className="text-neutro-400">{label}</span>
+        </Tooltip>
+        <span className="flex gap-3 whitespace-nowrap tabular-nums">
+          {values.map((v) => (
+            <span
+              key={v.name}
+              className={cn(
+                v.value === best ? "font-semibold text-acento-300" : "text-neutro-300",
+                "tabular-nums",
+              )}
+            >
+              {v.name} {pct(v.value)}
+            </span>
+          ))}
+        </span>
+      </div>
+      <div className="flex h-1 gap-0.5 overflow-hidden rounded-full bg-neutro-800">
         {values.map((v) => (
           <span
             key={v.name}
-            className={v.value === best ? "font-semibold text-acento-300" : "text-neutro-300"}
-          >
-            {v.name} {pct(v.value)}
-          </span>
+            className={cn(
+              "h-full rounded-full transition-all",
+              v.value === best ? "bg-acento-400" : "bg-neutro-700",
+            )}
+            style={{ width: pct(v.value) }}
+          />
         ))}
-      </span>
+      </div>
     </div>
   );
 }

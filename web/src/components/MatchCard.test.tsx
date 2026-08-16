@@ -12,6 +12,8 @@ function baseFixture(): Fixture {
     away: "Coventry City",
     homeShort: "ARS",
     awayShort: "COV",
+    homeLogo: null,
+    awayLogo: null,
     status: "pre",
     homeScore: null,
     awayScore: null,

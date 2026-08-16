@@ -1,8 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, LazyMotion, MotionConfig, domAnimation, m } from "motion/react";
-import { Activity, RotateCw, ShieldAlert, TrendingUp } from "lucide-react";
+import { Activity, Clock3, RotateCw, ShieldAlert, Sparkles, TrendingUp } from "lucide-react";
 import { fetchFixtures, fetchLeagues, fetchStats, type Fixture, type League, type Stats } from "./api";
 import MatchCard from "./components/MatchCard";
+import SpotlightCard from "./components/SpotlightCard";
+import Countdown from "./components/Countdown";
+import ConfidenceBadge from "./components/ConfidenceBadge";
 import { BAND_DOT } from "./bands";
 
 const FOCUS = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento-400";
@@ -25,9 +28,11 @@ function SkeletonCard() {
     >
       <div className="h-3 w-1/3 rounded bg-neutro-800" />
       <div className="mt-4 flex items-center justify-between gap-3">
+        <div className="h-10 w-10 shrink-0 rounded-base bg-neutro-800" />
         <div className="h-4 w-1/4 rounded bg-neutro-800" />
         <div className="h-2.5 w-8 rounded bg-neutro-700" />
         <div className="h-4 w-1/4 rounded bg-neutro-800" />
+        <div className="h-10 w-10 shrink-0 rounded-base bg-neutro-800" />
       </div>
       <div className="mt-4 h-9 rounded bg-neutro-800" />
     </div>
@@ -41,6 +46,7 @@ export default function App() {
   const [active, setActive] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [nextMatch, setNextMatch] = useState<number | null>(null);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -51,6 +57,13 @@ export default function App() {
       setFixtures(f);
       setStats(s);
       setActive((cur) => cur || l[0]?.code || "");
+      const now = Date.now();
+      const next = f
+        .filter((fx) => fx.status === "pre" && fx.prediction)
+        .map((fx) => new Date(fx.date).getTime())
+        .filter((t) => t > now)
+        .sort((a, b) => a - b)[0];
+      setNextMatch(next ?? null);
     } catch {
       if (!silent)
         setError(
@@ -77,6 +90,24 @@ export default function App() {
       window.removeEventListener("focus", refresh);
     };
   }, [load]);
+
+  const topPicks = useMemo(() => {
+    return fixtures
+      .filter((f) => f.status === "pre" && f.prediction)
+      .sort(
+        (a, b) =>
+          (b.prediction?.confidence.probability ?? 0) - (a.prediction?.confidence.probability ?? 0),
+      )
+      .slice(0, 3);
+  }, [fixtures]);
+
+  const countByLeague = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const f of fixtures) {
+      if (f.status === "pre") map.set(f.league, (map.get(f.league) ?? 0) + 1);
+    }
+    return map;
+  }, [fixtures]);
 
   const shown = active ? fixtures.filter((f) => f.league === active) : fixtures;
   const activeCode = active || leagues[0]?.code || "";
@@ -109,6 +140,12 @@ export default function App() {
                   Probabilidades de partidos por modelo estadístico · sin apuestas
                 </p>
               </div>
+              {nextMatch != null && (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-neutro-900 px-3 py-1.5 text-xs text-neutro-300 ring-1 ring-neutro-800">
+                  <Clock3 className="h-3.5 w-3.5 text-acento-400" aria-hidden="true" />
+                  Próximo partido en <Countdown target={nextMatch} />
+                </span>
+              )}
               <button
                 type="button"
                 onClick={() => !loading && load()}
@@ -155,6 +192,33 @@ export default function App() {
               </div>
             )}
 
+            {topPicks.length > 0 && (
+              <section aria-label="Mejores picks de hoy" className="mb-6">
+                <h2 className="mb-3 flex items-center gap-2 font-display text-sm font-bold uppercase tracking-wide text-neutro-200">
+                  <Sparkles className="h-4 w-4 text-acento-400" aria-hidden="true" />
+                  Mejores picks de hoy
+                </h2>
+                <div className="flex flex-col gap-3">
+                  {topPicks.map((f, i) => (
+                    <SpotlightCard key={f.id}>
+                      <div className="flex items-center gap-3 rounded-base border border-neutro-800/60 bg-neutro-900/70 p-3">
+                        <span className="font-display text-lg font-bold tabular-nums text-acento-400">
+                          {i + 1}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-display text-sm font-semibold text-neutro-100">
+                            {f.home} vs {f.away}
+                          </p>
+                          <p className="mt-0.5 truncate text-xs text-neutro-400">{f.league}</p>
+                        </div>
+                        <ConfidenceBadge confidence={f.prediction!.confidence} />
+                      </div>
+                    </SpotlightCard>
+                  ))}
+                </div>
+              </section>
+            )}
+
             <div
               role="tablist"
               aria-label="Ligas"
@@ -170,14 +234,23 @@ export default function App() {
                   aria-selected={activeCode === l.code}
                   aria-controls="panel-ligas"
                   onClick={() => setActive(l.code)}
-                  className={`min-h-11 shrink-0 rounded-full px-4 py-2 text-xs font-semibold transition-colors ${FOCUS} ${
+                  className={`inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold transition-colors ${FOCUS} ${
                     activeCode === l.code
                       ? "bg-acento-400 text-neutro-950"
                       : "bg-neutro-900 text-neutro-400 ring-1 ring-neutro-800 hover:text-neutro-200"
                   }`}
                 >
                   {l.label}
-                  {!l.hasModel && <span className="ml-1.5 text-xs text-neutro-500">sin modelo</span>}
+                  {!l.hasModel && <span className="text-neutro-500">sin modelo</span>}
+                  {(countByLeague.get(l.code) ?? 0) > 0 && (
+                    <span
+                      className={`rounded-full px-1.5 py-0.5 text-[10px] tabular-nums ${
+                        activeCode === l.code ? "bg-neutro-950/20 text-neutro-950" : "bg-neutro-800 text-neutro-300"
+                      }`}
+                    >
+                      {countByLeague.get(l.code)}
+                    </span>
+                  )}
                 </button>
               ))}
             </div>

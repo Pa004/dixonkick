@@ -92,6 +92,8 @@ export interface Fixture {
   away: string;
   homeShort: string;
   awayShort: string;
+  homeLogo: string | null;
+  awayLogo: string | null;
   status: string;
   homeScore: number | null;
   awayScore: number | null;

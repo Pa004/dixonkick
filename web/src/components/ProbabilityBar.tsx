@@ -4,43 +4,55 @@ interface Props {
   home: number;
   draw: number;
   away: number;
+  pick?: "H" | "D" | "A";
 }
 
 const pct = (v: number) => `${Math.round(v * 100)}%`;
 
-export default function ProbabilityBar({ home, draw, away }: Props) {
+// Segmentos muy angostos no muestran la etiqueta (la barra ya comunica el tamaño)
+function fits(w: number): boolean {
+  return w >= 0.13;
+}
+
+const SEG = {
+  H: "bg-acento-400 text-neutro-950",
+  D: "bg-empate-300 text-neutro-950",
+  A: "bg-visita-400 text-neutro-950",
+} as const;
+
+const HIT = {
+  H: "shadow-[inset_0_0_0_2px_oklch(0.24_0.03_170_/0.5)]",
+  D: "shadow-[inset_0_0_0_2px_oklch(0.24_0.02_262_/0.5)]",
+  A: "shadow-[inset_0_0_0_2px_oklch(0.24_0.03_20_/0.5)]",
+} as const;
+
+export default function ProbabilityBar({ home, draw, away, pick }: Props) {
   const shouldReduce = useReducedMotion();
+  const segments = [
+    { key: "H", w: home, cls: SEG.H, delay: 0 },
+    { key: "D", w: draw, cls: SEG.D, delay: 0.1 },
+    { key: "A", w: away, cls: SEG.A, delay: 0.2 },
+  ] as const;
 
   return (
     <m.div
       role="img"
       aria-label={`Probabilidades — Local ${pct(home)}, Empate ${pct(draw)}, Visita ${pct(away)}`}
-      className="flex h-9 w-full overflow-hidden rounded-base bg-neutro-900 text-xs font-bold"
+      className="flex h-9 w-full overflow-hidden rounded-base bg-neutro-900 text-xs font-bold ring-1 ring-neutro-800"
     >
-      <m.div
-        initial={shouldReduce ? { width: pct(home) } : { width: 0 }}
-        animate={{ width: pct(home) }}
-        transition={{ duration: 0.55, ease: "easeOut" }}
-        className="flex items-center justify-center bg-acento-400 text-neutro-950 tabular-nums"
-      >
-        {pct(home)}
-      </m.div>
-      <m.div
-        initial={shouldReduce ? { width: pct(draw) } : { width: 0 }}
-        animate={{ width: pct(draw) }}
-        transition={{ duration: 0.55, ease: "easeOut", delay: 0.12 }}
-        className="flex items-center justify-center bg-empate-300 text-neutro-950 tabular-nums"
-      >
-        {pct(draw)}
-      </m.div>
-      <m.div
-        initial={shouldReduce ? { width: pct(away) } : { width: 0 }}
-        animate={{ width: pct(away) }}
-        transition={{ duration: 0.55, ease: "easeOut", delay: 0.24 }}
-        className="flex items-center justify-center bg-visita-400 text-neutro-950 tabular-nums"
-      >
-        {pct(away)}
-      </m.div>
+      {segments.map((s) => (
+        <m.div
+          key={s.key}
+          initial={shouldReduce ? { width: pct(s.w) } : { width: 0 }}
+          animate={{ width: pct(s.w) }}
+          transition={{ duration: 0.55, ease: "easeOut", delay: s.delay }}
+          className={`flex min-w-0 items-center justify-center overflow-hidden whitespace-nowrap tabular-nums ${s.cls} ${
+            pick === s.key ? HIT[s.key] : ""
+          }`}
+        >
+          {fits(s.w) ? pct(s.w) : ""}
+        </m.div>
+      ))}
     </m.div>
   );
 }

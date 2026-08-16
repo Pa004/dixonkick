@@ -5,6 +5,8 @@ import type { Fixture, Prediction } from "../api";
 import ProbabilityBar from "./ProbabilityBar";
 import ConfidenceBadge from "./ConfidenceBadge";
 import Markets from "./Markets";
+import TeamCrest from "./TeamCrest";
+import { cn } from "../utils";
 
 const PICK_LABEL: Record<string, string> = { H: "Local", D: "Empate", A: "Visita" };
 
@@ -62,6 +64,48 @@ function ScoreHeatmap({ pred }: { pred: Prediction }) {
   );
 }
 
+function TeamSide({
+  name,
+  short,
+  logo,
+  picked,
+  align,
+}: {
+  name: string;
+  short: string;
+  logo: string | null;
+  picked: boolean;
+  align: "left" | "right";
+}) {
+  return (
+    <div
+      className={cn(
+        "flex flex-1 items-center gap-3 rounded-base px-2 py-1.5 transition-colors",
+        align === "right" && "justify-end text-right",
+        picked ? "bg-acento-500/10 ring-1 ring-acento-500/40" : "ring-1 ring-transparent",
+      )}
+    >
+      {align === "left" && <TeamCrest name={name} short={short} logo={logo} />}
+      <div className="min-w-0">
+        <span
+          className={cn(
+            "block truncate font-display text-sm font-semibold",
+            picked ? "text-acento-200" : "text-neutro-100",
+          )}
+        >
+          {name}
+        </span>
+        {picked && (
+          <span className="mt-0.5 inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-acento-300">
+            <Target className="h-3 w-3" aria-hidden="true" /> Favorito
+          </span>
+        )}
+      </div>
+      {align === "right" && <TeamCrest name={name} short={short} logo={logo} />}
+    </div>
+  );
+}
+
 export default function MatchCard({ fixture }: { fixture: Fixture }) {
   const [open, setOpen] = useState(false);
   const shouldReduce = useReducedMotion();
@@ -100,6 +144,10 @@ export default function MatchCard({ fixture }: { fixture: Fixture }) {
     </div>
   );
 
+  const pick = pred?.pick;
+  const pickedHome = pick === "H";
+  const pickedAway = pick === "A";
+
   return (
     <div className="rounded-base bg-neutro-900 shadow-card transition-shadow duration-200 hover:shadow-glow">
       <button
@@ -120,24 +168,22 @@ export default function MatchCard({ fixture }: { fixture: Fixture }) {
           <span className="font-semibold text-neutro-400">{fixture.league}</span>
         </div>
 
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex flex-1 items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-base bg-neutro-800 font-display text-xs font-bold text-neutro-200">
-              {fixture.homeShort || fixture.home.slice(0, 3)}
-            </div>
-            <span className="truncate font-display text-sm font-semibold text-neutro-100">
-              {fixture.home}
-            </span>
-          </div>
-          <span className="px-1 text-xs font-bold text-neutro-400">vs</span>
-          <div className="flex flex-1 items-center justify-end gap-3 text-right">
-            <span className="truncate font-display text-sm font-semibold text-neutro-100">
-              {fixture.away}
-            </span>
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-base bg-neutro-800 font-display text-xs font-bold text-neutro-200">
-              {fixture.awayShort || fixture.away.slice(0, 3)}
-            </div>
-          </div>
+        <div className="flex items-center justify-between gap-2">
+          <TeamSide
+            name={fixture.home}
+            short={fixture.homeShort}
+            logo={fixture.homeLogo}
+            picked={pickedHome}
+            align="left"
+          />
+          <span className="shrink-0 px-1 font-display text-xs font-bold text-neutro-500">vs</span>
+          <TeamSide
+            name={fixture.away}
+            short={fixture.awayShort}
+            logo={fixture.awayLogo}
+            picked={pickedAway}
+            align="right"
+          />
         </div>
 
         {fixture.status !== "pre" &&
@@ -169,6 +215,7 @@ export default function MatchCard({ fixture }: { fixture: Fixture }) {
               home={pred.probabilities.home}
               draw={pred.probabilities.draw}
               away={pred.probabilities.away}
+              pick={pick}
             />
             <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
               <div className="flex gap-3 text-neutro-400">
