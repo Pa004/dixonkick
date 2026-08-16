@@ -39,11 +39,11 @@ function setMeta(key: string, value: string): void {
   ).run(key, value);
 }
 
-export async function predictFixture(home: string, away: string): Promise<object> {
+export async function predictFixture(home: string, away: string, league: string): Promise<object> {
   const res = await fetch(`${ML_URL}/predict`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ home, away }),
+    body: JSON.stringify({ home, away, league }),
     signal: AbortSignal.timeout(8000),
   });
   if (!res.ok) throw new Error(`ml-service /predict ${res.status}: ${await res.text()}`);
@@ -65,7 +65,7 @@ export async function refreshFixtures(
   force = false,
 ): Promise<{ inserted: number; predicted: number }> {
   let inserted = 0;
-  const tasks: { id: string; home: string; away: string }[] = [];
+  const tasks: { id: string; home: string; away: string; league: string }[] = [];
 
   for (const [code, league] of Object.entries(LEAGUES)) {
     let fixtures;
@@ -106,22 +106,22 @@ export async function refreshFixtures(
 
       // force = modelo reentrenado: re-predice aunque la predicción ya tenga markets
       if (fx.status === "pre" && league.model && (force || !hasMarkets(existing?.prediction))) {
-        tasks.push({ id: fx.id, home: fx.home, away: fx.away });
+        tasks.push({ id: fx.id, home: fx.home, away: fx.away, league: code });
       }
     }
   }
 
   let predicted = 0;
-  await mapLimit(tasks, 5, async ({ id, home, away }) => {
+  await mapLimit(tasks, 5, async ({ id, home, away, league: code }) => {
     try {
-      const homeModel = await resolveTeam(home);
-      const awayModel = await resolveTeam(away);
+      const homeModel = await resolveTeam(home, code);
+      const awayModel = await resolveTeam(away, code);
       if (!homeModel || !awayModel) {
         // el modelo no tiene datos de alguno de los equipos; sin reintentos que lo arreglen
         db.prepare("UPDATE fixtures SET skip_reason='team_not_in_model' WHERE id=?").run(id);
         return;
       }
-      const pred = await predictWithRetry(homeModel, awayModel);
+      const pred = await predictWithRetry(homeModel, awayModel, code);
       db.prepare(
         "UPDATE fixtures SET home_model=?, away_model=?, prediction=?, skip_reason=NULL, predicted_at=datetime('now') WHERE id=?",
       ).run(homeModel, awayModel, JSON.stringify(pred), id);
@@ -144,11 +144,11 @@ export async function refreshFixtures(
 }
 
 // Un reintento inmediato absorbe latencias transitorias del ml-service sin bloquear el sync
-async function predictWithRetry(home: string, away: string): Promise<object> {
+async function predictWithRetry(home: string, away: string, league: string): Promise<object> {
   try {
-    return await predictFixture(home, away);
+    return await predictFixture(home, away, league);
   } catch {
-    return predictFixture(home, away);
+    return predictFixture(home, away, league);
   }
 }
 

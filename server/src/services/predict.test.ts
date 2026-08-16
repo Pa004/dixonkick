@@ -267,16 +267,29 @@ describe("refreshFixtures", () => {
     expect(result.predicted).toBe(0);
   });
 
-  it("marca no_model para ligas sin modelo", async () => {
+  it("predice la liga EC1 ahora que tiene modelo", async () => {
     espnMock.mockImplementation(async (espnLeague) => (espnLeague === "ecu.1" ? [fixture("ecu-1")] : []));
-    teamsMock.mockResolvedValue("Man City");
+    teamsMock.mockImplementation(async (_name, league) => (league === "EC1" ? "Barcelona SC" : null));
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({ pick: "H", confidence: { probability: 0.55 }, markets: { ft: {} } }),
+            { status: 200 },
+          ),
+      ),
+    );
 
     const result = await predict.refreshFixtures();
-    expect(result.predicted).toBe(0);
-    const row = db.prepare("SELECT skip_reason FROM fixtures WHERE id='ecu-1'").get() as {
+    expect(result.predicted).toBe(1);
+    const row = db.prepare("SELECT prediction, skip_reason FROM fixtures WHERE id='ecu-1'").get() as {
+      prediction: string | null;
       skip_reason: string | null;
     };
-    expect(row.skip_reason).toBe("no_model");
+    expect(row.skip_reason).toBeNull();
+    expect(row.prediction).toBeTruthy();
   });
 
   it("marca team_not_in_model cuando un equipo no resuelve", async () => {

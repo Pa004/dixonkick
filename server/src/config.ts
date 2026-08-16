@@ -10,7 +10,7 @@ export const LEAGUES: Record<string, { espn: string; label: string; model: strin
   I1: { espn: "ita.1", label: "Serie A", model: "I1" },
   D1: { espn: "ger.1", label: "Bundesliga", model: "D1" },
   F1: { espn: "fra.1", label: "Ligue 1", model: "F1" },
-  EC1: { espn: "ecu.1", label: "Liga Pro", model: null },
+  EC1: { espn: "ecu.1", label: "Liga Pro", model: "EC1" },
 };
 
 export const DB_PATH = process.env.DB_PATH || fileURLToPath(new URL("../data/futbol.db", import.meta.url));

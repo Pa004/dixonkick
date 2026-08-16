@@ -1,29 +1,40 @@
 import { ML_URL } from "./config.js";
 
-let modelTeams: string[] | null = null;
-let cachedAt = 0;
-let inflight: Promise<string[]> | null = null;
+// Caché por liga: el modelo global (default) y el de Liga Pro (EC1) son
+// espacios de nombres distintos en el ml-service (/teams?league=).
+const cache = new Map<string, { teams: string[]; cachedAt: number }>();
+const inflight = new Map<string, Promise<string[]>>();
 const TEAMS_TTL = 60 * 60 * 1000;
 
-export async function getModelTeams(): Promise<string[]> {
-  if (modelTeams && Date.now() - cachedAt < TEAMS_TTL) return modelTeams;
-  if (inflight) return inflight;
-  inflight = (async () => {
+// El ml-service tiene dos espacios: "global" (5 ligas europeas) y "EC1".
+// Todo código que no sea EC1 resuelve contra el modelo global.
+function modelFor(league: string): string {
+  return league === "EC1" ? "EC1" : "global";
+}
+
+export async function getModelTeams(league = "global"): Promise<string[]> {
+  const model = modelFor(league);
+  const hit = cache.get(model);
+  if (hit && Date.now() - hit.cachedAt < TEAMS_TTL) return hit.teams;
+  if (inflight.has(model)) return inflight.get(model)!;
+  const pending = (async () => {
     try {
-      const res = await fetch(`${ML_URL}/teams`, { signal: AbortSignal.timeout(8000) });
-      if (!res.ok) throw new Error(`ml-service /teams: ${res.status}`);
+      const url = `${ML_URL}/teams${model === "global" ? "" : `?league=${encodeURIComponent(model)}`}`;
+      const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+      if (!res.ok) throw new Error(`ml-service /teams (${model}): ${res.status}`);
       const data = (await res.json()) as { teams: string[] };
-      modelTeams = data.teams;
-      cachedAt = Date.now();
+      cache.set(model, { teams: data.teams, cachedAt: Date.now() });
+      return data.teams;
     } catch (err) {
-      if (modelTeams) return modelTeams; // caché vencida como respaldo
+      const cached = cache.get(model);
+      if (cached) return cached.teams; // caché vencida como respaldo
       throw err;
     } finally {
-      inflight = null;
+      inflight.delete(model);
     }
-    return modelTeams;
   })();
-  return inflight;
+  inflight.set(model, pending);
+  return pending;
 }
 
 const OVERRIDES: Record<string, string> = {
@@ -134,6 +145,26 @@ const OVERRIDES: Record<string, string> = {
   hanover: "Hannover",
   schalke: "Schalke 04",
   "werder bremen": "Werder Bremen",
+  // Liga Pro (EC1): el modelo ecuatoriano usa los displayName de ESPN, que son
+  // exactos; los overrides solo resuelven variantes y evitan colisionar con el
+  // espacio global (p. ej. "Barcelona" de La Liga).
+  "barcelona sc": "Barcelona SC",
+  "barcelona sc guayaquil": "Barcelona SC",
+  "ldu quito": "Liga de Quito",
+  "liga de quito": "Liga de Quito",
+  "independiente del valle": "Independiente del Valle",
+  "ind del valle": "Independiente del Valle",
+  "tecnico universitario": "Técnico Universitario",
+  "tecnico u": "Técnico Universitario",
+  "universidad catolica": "Universidad Católica (Quito)",
+  "universidad catolica quito": "Universidad Católica (Quito)",
+  "libertad ecuador": "Libertad (Ecuador)",
+  "libertad (ecuador)": "Libertad (Ecuador)",
+  "deportivo cuenca": "Deportivo Cuenca",
+  "dep. cuenca": "Deportivo Cuenca",
+  "guayaquil city": "Guayaquil City FC",
+  "manta f.c.": "Manta F.C.",
+  manta: "Manta F.C.",
 };
 
 function normalize(name: string): string {
@@ -167,9 +198,9 @@ function bestMatch(key: string, teams: string[]): string | null {
   return bestScore >= 0.8 ? best : null;
 }
 
-export async function resolveTeam(displayName: string): Promise<string | null> {
+export async function resolveTeam(displayName: string, league = "global"): Promise<string | null> {
   const key = normalize(displayName);
-  const teams = await getModelTeams();
+  const teams = await getModelTeams(league);
 
   const override = OVERRIDES[key];
   if (override) {
