@@ -188,7 +188,7 @@ Ver `.env.example` (raíz) y `web/.env.example`.
 Server (`/api`, puerto 4000):
 
 - `GET /api/leagues` — ligas y si tienen modelo
-- `GET /api/fixtures?league=XX` — fixtures con predicción y detalle (matriz de marcador, goles esperados, over 2.5, BTTS, mercados)
+- `GET /api/fixtures?league=XX` — fixtures con predicción y detalle (matriz de marcador, goles esperados, over 2.5, BTTS, mercados, escudos `homeLogo`/`awayLogo` de ESPN)
 - `GET /api/stats` — precisión total y por banda de confianza
 - `POST /api/refresh` — fuerza sync (requiere `REFRESH_TOKEN`)
 
