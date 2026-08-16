@@ -33,6 +33,7 @@ COUNT_GROUPS: dict[str, tuple[list[float], list[float], list[float]]] = {
 class Models:
     def __init__(self) -> None:
         self.ft: DixonColes | None = None
+        self.ft_ec1: DixonColes | None = None
         self.ht: DixonColes | None = None
         self.htft_cond: np.ndarray | None = None
         self.counts: dict[str, CountModel] = {}
@@ -44,6 +45,12 @@ class Models:
         if ft_path.exists():
             self.ft = DixonColes.load(ft_path)
             saved.append(_saved_at(ft_path))
+        # Modelo por-liga opcional (Liga Pro). Sin el, /predict devuelve 503
+        # solo para esa liga; el global no se ve afectado.
+        ec1_path = ARTIFACT_DIR / "dixon_coles_ec1.npz"
+        if ec1_path.exists():
+            self.ft_ec1 = DixonColes.load(ec1_path)
+            saved.append(_saved_at(ec1_path))
         ht_path = ARTIFACT_DIR / "dixon_coles_ht.npz"
         if ht_path.exists():
             self.ht = DixonColes.load(ht_path)
@@ -78,6 +85,18 @@ models = Models()
 class Fixture(BaseModel):
     home: str
     away: str
+    league: str = "global"
+
+
+def select_model(league: str) -> DixonColes:
+    """Modelo FT para la liga. EC1 usa su modelo por-liga; el resto, el global."""
+    if league == "EC1":
+        if models.ft_ec1 is None:
+            raise HTTPException(status_code=503, detail="modelo EC1 no cargado")
+        return models.ft_ec1
+    if models.ft is None:
+        raise HTTPException(status_code=503, detail="modelo base no cargado")
+    return models.ft
 
 
 @asynccontextmanager
@@ -93,10 +112,9 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(title="FutbolTipster ML Service", version="0.2.0", lifespan=lifespan)
 
 
-def build_prediction(home: str, away: str) -> dict:
-    assert models.ft is not None
-    base = models.ft.predict(home, away)
-    mat = models.ft.score_matrix(home, away)
+def build_prediction(home: str, away: str, base_model: DixonColes) -> dict:
+    base = base_model.predict(home, away)
+    mat = base_model.score_matrix(home, away)
 
     out: dict = {
         "ft": {
@@ -155,6 +173,7 @@ def health() -> dict:
     return {
         "status": "ok",
         "teams": len(models.ft.teams) if models.ft else 0,
+        "teams_ec1": len(models.ft_ec1.teams) if models.ft_ec1 else 0,
         "trained_at": models.trained_at,
     }
 
@@ -163,6 +182,7 @@ def health() -> dict:
 def models_status() -> dict:
     return {
         "ft": models.ft is not None,
+        "ft_ec1": models.ft_ec1 is not None,
         "ht": models.ht is not None,
         "ht_ft_conditional": models.htft_cond is not None,
         "counts": {name: name in models.counts for name in COUNT_GROUPS},
@@ -176,19 +196,20 @@ def bands() -> list[dict[str, float | str]]:
 
 
 @app.get("/teams")
-def teams() -> dict:
-    return {"teams": models.ft.teams if models.ft else []}
+def teams(league: str = "global") -> dict:
+    ft = select_model(league)
+    return {"teams": ft.teams}
 
 
 @app.post("/predict")
 def predict(fixture: Fixture) -> dict:
-    if models.ft is None:
-        raise HTTPException(status_code=503, detail="modelo no cargado")
+    ft = select_model(fixture.league)
     for team in (fixture.home, fixture.away):
-        if team not in models.ft.idx:
+        if team not in ft.idx:
             raise HTTPException(status_code=404, detail=f"equipo desconocido: {team}")
     return {
         "home": fixture.home,
         "away": fixture.away,
-        **build_prediction(fixture.home, fixture.away),
+        "league": fixture.league,
+        **build_prediction(fixture.home, fixture.away, ft),
     }
