@@ -107,3 +107,27 @@ def test_eventos_sin_valores_negativos(tmp_path):
     for col in ["HTHG", "HTAG", "HC", "AC"]:
         if data[col].notna().any():
             assert data[col].dropna().min() >= 0
+
+
+def write_ec1_minimal_csv(tmp_path: Path) -> Path:
+    rows = [
+        # CSV de ESPN: solo marcadores, sin stats de conteo ni HT
+        ["EC1", "15/02/2025", "Barcelona SC", "Emelec", 2, 1],
+        ["EC1", "22/02/2025", "Liga de Quito", "Independiente del Valle", 0, 0],
+    ]
+    df = pd.DataFrame(rows, columns=["Div", "Date", "HomeTeam", "AwayTeam", "FTHG", "FTAG"])
+    path = tmp_path / "EC12025.csv"
+    df.to_csv(path, index=False)
+    return path
+
+
+def test_load_history_acepta_csv_minimo_de_espectro(tmp_path):
+    write_ec1_minimal_csv(tmp_path)
+    data = load_history(data_dir=tmp_path)
+    assert list(data["League"].unique()) == ["EC1"]
+    assert len(data) == 2
+    assert data["FTHG"].dtype.kind == "i"
+    assert data["FTAG"].dtype.kind == "i"
+    # Las columnas de conteo ausentes propagan NaN para que cada modelo filtre
+    for col in ["HC", "AC", "HTHG", "HTAG"]:
+        assert data[col].isna().all()

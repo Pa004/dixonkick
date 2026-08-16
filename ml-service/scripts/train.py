@@ -7,6 +7,7 @@ empirica HT/FT (P(FT | HT)) con decaimiento temporal.
 
 from __future__ import annotations
 
+import argparse
 import sys
 from pathlib import Path
 
@@ -51,7 +52,38 @@ def htft_conditional(data: pd.DataFrame, decay: float) -> np.ndarray:
     return cond
 
 
+def train_league(code: str) -> None:
+    """Modelo Dixon-Coles FT exclusivo para una liga (p. ej. EC1).
+
+    Los CSV de esa liga deben existir en data/. No toca los artefactos globales.
+    """
+    data = load_history(leagues={code: "x"})
+    if data.empty:
+        raise SystemExit(f"no hay datos para {code} en data/")
+    ft = DixonColes()
+    ft.fit(data["Date"], data["HomeTeam"], data["AwayTeam"], data["FTHG"], data["FTAG"])
+    out = ARTIFACT_DIR / f"dixon_coles_{code.lower()}.npz"
+    ft.save(out)
+    print(
+        f"{code}: equipos={len(ft.teams)} gamma={ft.gamma:.3f} rho={ft.rho:.4f} "
+        f"n={ft.n_matches} -> {out.name}"
+    )
+
+
 def main() -> None:
+    parser = argparse.ArgumentParser(description="Entrena los modelos de mercados.")
+    parser.add_argument(
+        "--league",
+        default=None,
+        help="código de liga para entrenar SOLO su Dixon-Coles FT "
+        "(p. ej. EC1); sin flag entrena todo el pipeline global",
+    )
+    args = parser.parse_args()
+
+    if args.league:
+        train_league(args.league.upper())
+        return
+
     data = load_history()
     ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
 

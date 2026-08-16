@@ -107,3 +107,18 @@ def test_save_load_roundtrip(tmp_path):
     data = np.load(path, allow_pickle=True)
     assert "saved_at" in data and "n_matches" in data  # metadata versionada
     assert int(data["n_matches"][0]) > 0
+
+
+def test_small_sample_predice_con_poquitos_partidos():
+    """Liga con poca historia (caso EC1): el modelo ajusta y predice 1X2 válido."""
+    dates = [pd.Timestamp("2024-02-01"), pd.Timestamp("2024-02-08"), pd.Timestamp("2024-02-15")]
+    home = ["Barcelona SC", "Emelec", "Liga de Quito"]
+    away = ["Emelec", "Liga de Quito", "Barcelona SC"]
+    gh = [2, 0, 1]
+    ga = [0, 0, 1]
+    model = DixonColes()
+    model.fit(np.array(dates), home, away, gh, ga)
+    p = model.predict("Barcelona SC", "Emelec")
+    assert p["pick"] in {"H", "D", "A"}
+    assert sum(p["probabilities"].values()) == pytest.approx(1.0, abs=1e-6)
+    assert "Barcelona SC" in model.teams and "Emelec" in model.teams

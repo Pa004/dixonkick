@@ -8,7 +8,14 @@ import pandas as pd
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 
-LEAGUES = {"E0": "england", "SP1": "spain", "I1": "italy", "D1": "germany", "F1": "france"}
+LEAGUES = {
+    "E0": "england",
+    "SP1": "spain",
+    "I1": "italy",
+    "D1": "germany",
+    "F1": "france",
+    "EC1": "ecuador",
+}
 COLS = [
     "Div",
     "Date",
@@ -55,7 +62,13 @@ def load_history(
         league_code = file.stem[:-4]
         if league_code not in leagues:
             continue
-        df = pd.read_csv(file, usecols=COLS)
+        # Los CSV de ligas sin mercado de conteo (p. ej. EC1 de ESPN) traen solo
+        # marcadores; leer la intersección con COLS y reindexar para que cada
+        # modelo filtre con dropna las columnas que le falten.
+        present = pd.read_csv(file, nrows=0).columns
+        usecols = [c for c in COLS if c in present]
+        df = pd.read_csv(file, usecols=usecols)
+        df = df.reindex(columns=COLS)
         df["League"] = league_code
         frames.append(df)
     data = pd.concat(frames, ignore_index=True)
