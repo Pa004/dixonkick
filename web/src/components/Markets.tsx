@@ -1,8 +1,9 @@
 import { useState, useId, type ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
-import type { CountMarkets, Markets as MarketsData, MarketProbs } from "../api";
+import type { CountMarkets, HtFtCell, Markets as MarketsData, MarketProbs } from "../api";
 import Tooltip from "./Tooltip";
 import { cn } from "../utils";
+import { heatColor } from "../heat";
 
 const pct = (v: number) => `${Math.round(v * 100)}%`;
 
@@ -127,6 +128,49 @@ function MostRows({ most }: { most: CountMarkets["most"] }) {
   );
 }
 
+function HtFtHeatmap({ cells }: { cells: HtFtCell[] }) {
+  const byCell = new Map(cells.map((c) => [`${c.ht}/${c.ft}`, c.prob]));
+  const htOrder = ["H", "D", "A"] as const;
+  return (
+    <div className="overflow-x-auto">
+      <table className="border-separate border-spacing-0.5 text-center text-xs">
+        <thead>
+          <tr>
+            <th scope="col" className="pr-2 text-right font-normal text-neutro-500">
+              HT\FT
+            </th>
+            {htOrder.map((ft) => (
+              <th key={ft} scope="col" className="px-1.5 font-normal text-neutro-400">
+                {ft}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {htOrder.map((ht) => (
+            <tr key={ht}>
+              <th scope="row" className="pr-2 text-right font-semibold text-neutro-400">
+                {ht}
+              </th>
+              {htOrder.map((ft) => {
+                const p = byCell.get(`${ht}/${ft}`) ?? 0;
+                return (
+                  <td
+                    key={`${ht}/${ft}`}
+                    className={`min-w-12 rounded px-1.5 py-1 font-semibold tabular-nums ${heatColor(p)}`}
+                  >
+                    {Math.round(p * 100)}%
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function Section({ title, children }: { title: string; children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const id = useId();
@@ -248,19 +292,7 @@ export default function Markets({ markets }: { markets: MarketsData }) {
 
       {ht_ft && ht_ft.length > 0 && (
         <Section title="HT/FT">
-          <div className="grid grid-cols-3 gap-1 py-1">
-            {ht_ft.map((cell) => (
-              <div
-                key={`${cell.ht}-${cell.ft}`}
-                className="rounded bg-neutro-800/50 px-1 py-0.5 text-center text-xs tabular-nums"
-              >
-                <span className="text-neutro-400">
-                  {cell.ht}/{cell.ft}
-                </span>{" "}
-                <span className="text-neutro-100">{pct(cell.prob)}</span>
-              </div>
-            ))}
-          </div>
+          <HtFtHeatmap cells={ht_ft} />
         </Section>
       )}
 

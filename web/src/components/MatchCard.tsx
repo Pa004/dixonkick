@@ -7,6 +7,7 @@ import ConfidenceBadge from "./ConfidenceBadge";
 import Markets from "./Markets";
 import TeamCrest from "./TeamCrest";
 import { cn } from "../utils";
+import { heatColor } from "../heat";
 
 const PICK_LABEL: Record<string, string> = { H: "Local", D: "Empate", A: "Visita" };
 
@@ -15,13 +16,6 @@ const SKIP_LABEL: Record<string, string> = {
   team_not_in_model: "Equipo sin datos en el modelo",
   predict_failed: "Predicción falló; se reintentará en el próximo sync",
 };
-
-function heatColor(p: number): string {
-  if (p < 0.03) return "bg-neutro-850 text-neutro-500";
-  if (p < 0.08) return "bg-neutro-800 text-neutro-400";
-  if (p < 0.15) return "bg-acento-950 text-acento-300";
-  return "bg-acento-400 text-neutro-950";
-}
 
 function ScoreHeatmap({ pred }: { pred: Prediction }) {
   const mat = pred.score_matrix;
