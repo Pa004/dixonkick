@@ -140,7 +140,30 @@ export default function MatchCard({ fixture }: { fixture: Fixture }) {
           </div>
         </div>
 
-        {pred ? (
+        {fixture.status !== "pre" &&
+        fixture.homeScore != null &&
+        fixture.awayScore != null ? (
+          <div className="flex items-center justify-between gap-3">
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                fixture.status === "post"
+                  ? "bg-neutro-800 text-neutro-300"
+                  : "bg-acento-400 text-neutro-950"
+              }`}
+            >
+              <span
+                aria-hidden="true"
+                className={`h-1.5 w-1.5 rounded-full ${
+                  fixture.status === "post" ? "bg-neutro-500" : "animate-pulse bg-neutro-950"
+                }`}
+              />
+              {fixture.status === "post" ? "Finalizado" : "En vivo"}
+            </span>
+            <span className="font-display text-xl font-bold tabular-nums text-neutro-100">
+              {fixture.homeScore}-{fixture.awayScore}
+            </span>
+          </div>
+        ) : pred ? (
           <div className="flex flex-col gap-2">
             <ProbabilityBar
               home={pred.probabilities.home}

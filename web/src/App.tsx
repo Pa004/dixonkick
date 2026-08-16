@@ -42,8 +42,8 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     setError(null);
     try {
       const [l, f, s] = await Promise.all([fetchLeagues(), fetchFixtures(), fetchStats()]);
@@ -52,16 +52,30 @@ export default function App() {
       setStats(s);
       setActive((cur) => cur || l[0]?.code || "");
     } catch {
-      setError(
-        "No se pudieron cargar los datos. Comprueba que los servicios estén activos e intenta de nuevo.",
-      );
+      if (!silent)
+        setError(
+          "No se pudieron cargar los datos. Comprueba que los servicios estén activos e intenta de nuevo.",
+        );
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
     load();
+  }, [load]);
+
+  // Refresco silencioso: mantiene la interfaz al día sin parpadear los skeletons
+  useEffect(() => {
+    const refresh = () => {
+      if (!document.hidden) load(true);
+    };
+    const id = setInterval(refresh, 60_000);
+    window.addEventListener("focus", refresh);
+    return () => {
+      clearInterval(id);
+      window.removeEventListener("focus", refresh);
+    };
   }, [load]);
 
   const shown = active ? fixtures.filter((f) => f.league === active) : fixtures;
@@ -197,7 +211,7 @@ export default function App() {
                       </p>
                       <button
                         type="button"
-                        onClick={load}
+                        onClick={() => load()}
                         className={`min-h-11 rounded-base border border-neutro-700 px-4 py-2 text-xs font-semibold text-neutro-300 transition-colors hover:border-acento-500/60 hover:text-acento-300 ${FOCUS}`}
                       >
                         Reintentar

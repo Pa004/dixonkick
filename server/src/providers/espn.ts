@@ -26,7 +26,8 @@ export async function fetchLeagueFixtures(espnLeague: string): Promise<
     awayScore: number | null;
   }[]
 > {
-  const range = `dates=${isoDay(0)}-${isoDay(14)}`;
+  // Ventana hacia atrás para re-consultar partidos jugados y asentar resultados
+  const range = `dates=${isoDay(-2)}-${isoDay(14)}`;
   const url = `https://site.api.espn.com/apis/site/v2/sports/soccer/${espnLeague}/scoreboard?${range}`;
   const res = await fetch(url, {
     headers: { "User-Agent": "futboltipster/0.1" },

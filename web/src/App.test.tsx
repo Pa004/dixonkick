@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { act, render, screen } from "@testing-library/react";
 import App from "./App";
 
 const mockLeagues = [{ code: "E0", label: "Premier League", hasModel: true }];
@@ -17,6 +17,10 @@ beforeEach(() => {
   vi.mocked(fetchLeagues).mockReset();
   vi.mocked(fetchFixtures).mockReset();
   vi.mocked(fetchStats).mockReset();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe("App", () => {
@@ -38,5 +42,24 @@ describe("App", () => {
     render(<App />);
 
     expect(await screen.findByRole("tab", { name: /Premier League/ })).toBeInTheDocument();
+  });
+
+  it("re-fetchea los datos en el refresco automático", async () => {
+    vi.useFakeTimers();
+    vi.mocked(fetchLeagues).mockResolvedValue(mockLeagues);
+    vi.mocked(fetchFixtures).mockResolvedValue([]);
+    vi.mocked(fetchStats).mockResolvedValue(mockStats);
+
+    render(<App />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(screen.getByRole("tab", { name: /Premier League/ })).toBeInTheDocument();
+    expect(fetchFixtures).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+    expect(fetchFixtures).toHaveBeenCalledTimes(2);
   });
 });

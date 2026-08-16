@@ -35,7 +35,7 @@ api.get("/fixtures", (req, res) => {
   const league = String(req.query.league ?? "");
   const rows = db
     .prepare(
-      "SELECT * FROM fixtures WHERE (? = '' OR league = ?) AND date > datetime('now', '-2 days') ORDER BY date LIMIT 100",
+      "SELECT * FROM fixtures WHERE (? = '' OR league = ?) AND date >= datetime('now', 'start of day') ORDER BY date LIMIT 100",
     )
     .all(league, league) as Record<string, unknown>[];
   res.json(
