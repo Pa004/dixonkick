@@ -82,11 +82,12 @@ export async function refreshFixtures(
       const skipReason = fx.status === "pre" && !league.model ? "no_model" : null;
       const upsert = db.prepare(`
         INSERT INTO fixtures
-          (id, league, date, home, away, home_short, away_short, status, home_score, away_score, skip_reason)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          (id, league, date, home, away, home_short, away_short, home_logo, away_logo, status, home_score, away_score, skip_reason)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
           date=excluded.date, status=excluded.status,
           home_score=excluded.home_score, away_score=excluded.away_score,
+          home_logo=excluded.home_logo, away_logo=excluded.away_logo,
           skip_reason=excluded.skip_reason
       `);
       upsert.run(
@@ -97,6 +98,8 @@ export async function refreshFixtures(
         fx.away,
         fx.homeShort,
         fx.awayShort,
+        fx.homeLogo,
+        fx.awayLogo,
         fx.status,
         fx.homeScore,
         fx.awayScore,

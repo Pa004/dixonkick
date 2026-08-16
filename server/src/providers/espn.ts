@@ -5,7 +5,11 @@ interface EspnEvent {
   date: string;
   status?: { type?: { state?: string; completed: boolean } };
   competitions?: {
-    competitors: { homeAway: string; score?: string; team: { displayName: string; abbreviation: string } }[];
+    competitors: {
+      homeAway: string;
+      score?: string;
+      team: { displayName: string; abbreviation: string; logo?: string; logos?: { href: string }[] };
+    }[];
   }[];
 }
 
@@ -21,6 +25,8 @@ export async function fetchLeagueFixtures(espnLeague: string): Promise<
     away: string;
     homeShort: string;
     awayShort: string;
+    homeLogo: string | null;
+    awayLogo: string | null;
     status: string;
     homeScore: number | null;
     awayScore: number | null;
@@ -43,6 +49,12 @@ export async function fetchLeagueFixtures(espnLeague: string): Promise<
       if (!comp?.competitors) return null;
       const home = comp.competitors.find((c) => c.homeAway === "home");
       const away = comp.competitors.find((c) => c.homeAway === "away");
+      const logo = (c?: typeof home): string | null => {
+        const single = c?.team.logo;
+        if (single && single.startsWith("http")) return single;
+        const href = c?.team.logos?.[0]?.href;
+        return href && href.startsWith("http") ? href : null;
+      };
       const score = (c?: typeof home): number | null => {
         if (c?.score == null || c.score === "") return null;
         const n = Number(c.score);
@@ -55,6 +67,8 @@ export async function fetchLeagueFixtures(espnLeague: string): Promise<
         away: away?.team.displayName ?? "?",
         homeShort: home?.team.abbreviation ?? "",
         awayShort: away?.team.abbreviation ?? "",
+        homeLogo: logo(home),
+        awayLogo: logo(away),
         status: ev.status?.type?.state ?? "pre",
         homeScore: score(home),
         awayScore: score(away),

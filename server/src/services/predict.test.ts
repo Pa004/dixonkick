@@ -228,6 +228,19 @@ describe("refreshFixtures", () => {
     expect(JSON.parse(row.prediction).pick).toBe("H");
   });
 
+  it("persiste los escudos de ESPN en el fixture", async () => {
+    espnMock.mockImplementation(async (espnLeague) => (espnLeague === "eng.1" ? [fixture("epl-shield")] : []));
+    teamsMock.mockResolvedValue(null);
+
+    await predict.refreshFixtures();
+    const row = db.prepare("SELECT home_logo, away_logo FROM fixtures WHERE id='epl-shield'").get() as {
+      home_logo: string | null;
+      away_logo: string | null;
+    };
+    expect(row.home_logo).toBe("https://a.espncdn.com/i/team_logos/soccer/500/1000.png");
+    expect(row.away_logo).toBe("https://a.espncdn.com/i/team_logos/soccer/500/1001.png");
+  });
+
   it("re-predice una predicción en formato viejo (sin markets)", async () => {
     seedFixture({
       id: "epl-3",
@@ -358,6 +371,8 @@ function fixture(id: string) {
     away: "Arsenal",
     homeShort: "MCI",
     awayShort: "ARS",
+    homeLogo: "https://a.espncdn.com/i/team_logos/soccer/500/1000.png",
+    awayLogo: "https://a.espncdn.com/i/team_logos/soccer/500/1001.png",
     status: "pre",
     homeScore: null,
     awayScore: null,

@@ -47,6 +47,8 @@ api.get("/fixtures", (req, res) => {
       away: r.away,
       homeShort: r.home_short,
       awayShort: r.away_short,
+      homeLogo: r.home_logo ?? null,
+      awayLogo: r.away_logo ?? null,
       status: r.status,
       homeScore: r.home_score,
       awayScore: r.away_score,

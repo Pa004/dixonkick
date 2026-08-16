@@ -46,3 +46,9 @@ const fixtureCols = db.prepare("PRAGMA table_info(fixtures)").all() as { name: s
 if (!fixtureCols.some((c) => c.name === "skip_reason")) {
   db.exec("ALTER TABLE fixtures ADD COLUMN skip_reason TEXT");
 }
+if (!fixtureCols.some((c) => c.name === "home_logo")) {
+  db.exec("ALTER TABLE fixtures ADD COLUMN home_logo TEXT");
+}
+if (!fixtureCols.some((c) => c.name === "away_logo")) {
+  db.exec("ALTER TABLE fixtures ADD COLUMN away_logo TEXT");
+}
