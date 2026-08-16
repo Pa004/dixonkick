@@ -115,6 +115,7 @@ Hitos principales y qué se arregló:
 - **Backtest**: rentabilidad de los 14 mercados con cuotas sintéticas SBOBET. Corrigió bugs de asentamiento (el "más X" de conteos se asentaba con goles en vez de los conteos; doble oportunidad usaba un solo ganador en vez del conjunto; línea de hándicap 0.5→-0.5).
 - **Forma reciente**: covariable de media móvil (k=5) por equipo en los modelos de conteo. Corrigió la indexación de la forma al entrenar (acceso posicional vs por etiqueta en `rolling_form`).
 - **Robustez del server**: re-predice fixtures guardados con formato de predicción viejo; protección de `/api/refresh` con token + rate-limit; CORS y cabeceras de seguridad; sync tolerante a fallos de ESPN y ml-service.
+- **Observabilidad del sync**: el server persiste el motivo de cada predicción faltante (`skip_reason`: liga sin modelo, equipo sin datos, fallo del modelo) y el web lo explica con etiquetas precisas; un reintento inmediato absorbe fallas transitorias del ml-service.
 - **Calidad**: eslint/prettier (web y server) y ruff (ml-service); tests con vitest y pytest; lock de dependencias Python.
 - **Operación (Paso 7)**: re-predicción automática al reentrenar (el server compara `trained_at` del modelo y fuerza re-predicción de los partidos pendientes); cron de sync configurable (`SYNC_CRON`); CI en GitHub Actions (lint + tests en los 3 servicios). Las bandas de confianza pasan a tener una única fuente de verdad (`GET /bands` en el ml-service) y la UI degrada con elegancia si falta un modelo de mercado.
 
@@ -217,9 +218,12 @@ Tests: vitest (web y server), pytest (ml-service). El lock de dependencias Pytho
 
 ## Roadmap
 
-- **Paso 5 — Recalibración por banda** (media prioridad, **solo si se monetiza**): el ROI plano entre bandas no justifica el esfuerzo ahora. Decisión abierta: retomar cuando el proyecto genere ingresos.
-- **Paso 6 — G5 goleador** (fase aparte): requiere spec propia antes de implementar.
-- **Paso 8 — Deploy**: servir `web/dist` desde el server y publicar los 3 servicios.
+Estado actual: seguridad, pulido visual, smoke E2E, `node-cron@4` y robustez del sync (motivo de predicción faltante) están implementados. El bloque de datos con `firecrawl` está descartado: los CSVs de `ml-service/data/` cubren 2014-2025 y solo se regenerarían ante pérdida o extensión de la ventana.
+
+Pendiente, con disparadores condicionales:
+
+- **Paso 5 — Recalibración por banda** (diferido): el backtest muestra ROI plano entre bandas y la calibración no separa rentabilidad (`scripts/backtest.py`). Se retomará **solo si el proyecto se monetiza**. Antes de arrancar, correr `python scripts/validate.py` y comparar el `rate` empírico por banda con la etiqueta: si la calibración es correcta, el esfuerzo es un no-op.
+- **Paso 6 — G5 goleador** (diferido): mercados a nivel jugador (anytime scorer, primer gol de jugador, top scorer). Los CSVs de football-data.co.uk son solo a nivel equipo, así que requiere una fuente con goleadores por partido. Se retomará **solo si ESPN expone goleadores por evento** en la API que el server ya consume (sin scraping ni ToS gris); si la única vía es Understat/FBref (scraping frágil) o una API de pago, no vale la pena. Requiere spec propia antes de implementar.
 
 ## Notas de desarrollo
 
