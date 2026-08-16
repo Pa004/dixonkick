@@ -7,6 +7,7 @@ import SpotlightCard from "./components/SpotlightCard";
 import Countdown from "./components/Countdown";
 import ConfidenceBadge from "./components/ConfidenceBadge";
 import BandLegend from "./components/BandLegend";
+import MatchToolbar, { type SortMode } from "./components/MatchToolbar";
 import { BAND_DOT } from "./bands";
 
 const FOCUS = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento-400";
@@ -48,6 +49,8 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [nextMatch, setNextMatch] = useState<number | null>(null);
+  const [sort, setSort] = useState<SortMode>("date");
+  const [onlyPredicted, setOnlyPredicted] = useState(false);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -110,7 +113,19 @@ export default function App() {
     return map;
   }, [fixtures]);
 
-  const shown = active ? fixtures.filter((f) => f.league === active) : fixtures;
+  const shown = useMemo(() => {
+    let list = active ? fixtures.filter((f) => f.league === active) : fixtures;
+    if (onlyPredicted) list = list.filter((f) => f.prediction);
+    if (sort === "confidence") {
+      list = [...list].sort(
+        (a, b) =>
+          (b.prediction?.confidence.probability ?? 0) - (a.prediction?.confidence.probability ?? 0),
+      );
+    } else {
+      list = [...list].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    }
+    return list;
+  }, [active, fixtures, onlyPredicted, sort]);
   const activeCode = active || leagues[0]?.code || "";
   const stateKey = loading ? "loading" : error ? "error" : shown.length === 0 ? "empty" : activeCode;
 
@@ -258,6 +273,15 @@ export default function App() {
                 </button>
               ))}
             </div>
+
+            {!loading && !error && shown.length > 0 && (
+              <MatchToolbar
+                sort={sort}
+                onSort={setSort}
+                onlyPredicted={onlyPredicted}
+                onOnlyPredicted={setOnlyPredicted}
+              />
+            )}
 
             <div
               id="panel-ligas"
