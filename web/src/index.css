@@ -9,41 +9,41 @@
   --font-sans: "Geist", system-ui, sans-serif;
   --font-display: "Sora", "Geist", sans-serif;
 
-  --color-acento-50: oklch(0.985 0.008 170);
-  --color-acento-100: oklch(0.965 0.02 170);
-  --color-acento-200: oklch(0.93 0.05 170);
-  --color-acento-300: oklch(0.88 0.095 170);
-  --color-acento-400: oklch(0.805 0.135 170);
-  --color-acento-500: oklch(0.72 0.155 170);
-  --color-acento-600: oklch(0.635 0.135 170);
-  --color-acento-700: oklch(0.55 0.115 170);
-  --color-acento-800: oklch(0.45 0.09 170);
-  --color-acento-900: oklch(0.34 0.06 170);
-  --color-acento-950: oklch(0.245 0.04 170);
+  --color-acento-50: oklch(0.16 0.03 170);
+  --color-acento-100: oklch(0.25 0.04 170);
+  --color-acento-200: oklch(0.35 0.06 170);
+  --color-acento-300: oklch(0.45 0.09 170);
+  --color-acento-400: oklch(0.55 0.12 170);
+  --color-acento-500: oklch(0.62 0.13 170);
+  --color-acento-600: oklch(0.7 0.12 170);
+  --color-acento-700: oklch(0.78 0.09 170);
+  --color-acento-800: oklch(0.86 0.06 170);
+  --color-acento-900: oklch(0.91 0.04 170);
+  --color-acento-950: oklch(0.95 0.025 170);
 
-  --color-neutro-50: oklch(0.987 0.003 262);
-  --color-neutro-100: oklch(0.963 0.004 262);
-  --color-neutro-200: oklch(0.925 0.006 262);
-  --color-neutro-300: oklch(0.845 0.009 262);
-  --color-neutro-400: oklch(0.7 0.011 262);
-  --color-neutro-500: oklch(0.58 0.012 262);
-  --color-neutro-600: oklch(0.47 0.01 262);
-  --color-neutro-700: oklch(0.37 0.009 262);
-  --color-neutro-800: oklch(0.28 0.008 262);
-  --color-neutro-850: oklch(0.24 0.007 262);
-  --color-neutro-900: oklch(0.205 0.006 262);
-  --color-neutro-950: oklch(0.14 0.005 262);
+  --color-neutro-50: oklch(0.15 0.005 262);
+  --color-neutro-100: oklch(0.25 0.008 262);
+  --color-neutro-200: oklch(0.35 0.009 262);
+  --color-neutro-300: oklch(0.45 0.01 262);
+  --color-neutro-400: oklch(0.55 0.011 262);
+  --color-neutro-500: oklch(0.65 0.011 262);
+  --color-neutro-600: oklch(0.75 0.009 262);
+  --color-neutro-700: oklch(0.85 0.007 262);
+  --color-neutro-800: oklch(0.9 0.005 262);
+  --color-neutro-850: oklch(0.94 0.004 262);
+  --color-neutro-900: oklch(0.985 0.002 262);
+  --color-neutro-950: oklch(0.97 0.003 262);
 
-  --color-visita-300: oklch(0.8 0.14 20);
-  --color-visita-400: oklch(0.718 0.185 20);
-  --color-visita-500: oklch(0.637 0.215 20);
-  --color-visita-600: oklch(0.555 0.19 20);
-  --color-visita-700: oklch(0.475 0.145 20);
+  --color-visita-300: oklch(0.65 0.16 20);
+  --color-visita-400: oklch(0.5 0.19 20);
+  --color-visita-500: oklch(0.42 0.18 20);
+  --color-visita-600: oklch(0.35 0.16 20);
+  --color-visita-700: oklch(0.28 0.12 20);
 
-  --color-empate-300: oklch(0.83 0.015 262);
-  --color-empate-400: oklch(0.72 0.02 262);
-  --color-empate-500: oklch(0.62 0.025 262);
-  --color-empate-700: oklch(0.44 0.015 262);
+  --color-empate-300: oklch(0.5 0.02 262);
+  --color-empate-400: oklch(0.42 0.018 262);
+  --color-empate-500: oklch(0.35 0.016 262);
+  --color-empate-700: oklch(0.22 0.012 262);
 
   --radius-base: 0.75rem;
   --radius-full: 9999px;
@@ -55,6 +55,16 @@
 
 body {
   @apply bg-neutro-950 text-neutro-100 antialiased;
+  background-image:
+    radial-gradient(1200px 600px at 15% -10%, oklch(0.55 0.15 170 / 0.1), transparent 60%),
+    radial-gradient(1000px 500px at 85% 0%, oklch(0.5 0.14 170 / 0.08), transparent 55%),
+    linear-gradient(oklch(0.2 0.006 262 / 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, oklch(0.2 0.006 262 / 0.06) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 56px 56px, 56px 56px;
+  background-attachment: fixed;
+}
+
+.dark body {
   background-image:
     radial-gradient(1200px 600px at 15% -10%, oklch(0.34 0.06 170 / 0.18), transparent 60%),
     radial-gradient(1000px 500px at 85% 0%, oklch(0.245 0.04 170 / 0.16), transparent 55%),
@@ -106,6 +116,41 @@ body {
 }
 
 :root {
+  --background: oklch(0.97 0.003 262);
+  --foreground: oklch(0.25 0.008 262);
+  --card: oklch(0.985 0.002 262);
+  --card-foreground: oklch(0.25 0.008 262);
+  --popover: oklch(0.985 0.002 262);
+  --popover-foreground: oklch(0.25 0.008 262);
+  --primary: oklch(0.55 0.15 170);
+  --primary-foreground: oklch(0.985 0.002 262);
+  --secondary: oklch(0.94 0.003 262);
+  --secondary-foreground: oklch(0.4 0.009 262);
+  --muted: oklch(0.94 0.003 262);
+  --muted-foreground: oklch(0.55 0.01 262);
+  --accent: oklch(0.91 0.02 170);
+  --accent-foreground: oklch(0.4 0.03 170);
+  --destructive: oklch(0.5 0.19 20);
+  --border: oklch(0.88 0.004 262);
+  --input: oklch(0.88 0.004 262);
+  --ring: oklch(0.55 0.15 170);
+  --chart-1: oklch(0.55 0.15 170);
+  --chart-2: oklch(0.5 0.19 20);
+  --chart-3: oklch(0.5 0.02 262);
+  --chart-4: oklch(0.62 0.15 170);
+  --chart-5: oklch(0.7 0.01 262);
+  --radius: 0.75rem;
+  --sidebar: oklch(0.985 0.002 262);
+  --sidebar-foreground: oklch(0.25 0.008 262);
+  --sidebar-primary: oklch(0.55 0.15 170);
+  --sidebar-primary-foreground: oklch(0.985 0.002 262);
+  --sidebar-accent: oklch(0.91 0.02 170);
+  --sidebar-accent-foreground: oklch(0.4 0.03 170);
+  --sidebar-border: oklch(0.88 0.004 262);
+  --sidebar-ring: oklch(0.55 0.15 170);
+}
+
+.dark {
   --background: oklch(0.14 0.005 262);
   --foreground: oklch(0.963 0.004 262);
   --card: oklch(0.205 0.006 262);
@@ -138,6 +183,44 @@ body {
   --sidebar-accent-foreground: oklch(0.93 0.05 170);
   --sidebar-border: oklch(0.37 0.009 262);
   --sidebar-ring: oklch(0.805 0.135 170);
+}
+
+.dark {
+  --color-acento-50: oklch(0.985 0.008 170);
+  --color-acento-100: oklch(0.965 0.02 170);
+  --color-acento-200: oklch(0.93 0.05 170);
+  --color-acento-300: oklch(0.88 0.095 170);
+  --color-acento-400: oklch(0.805 0.135 170);
+  --color-acento-500: oklch(0.72 0.155 170);
+  --color-acento-600: oklch(0.635 0.135 170);
+  --color-acento-700: oklch(0.55 0.115 170);
+  --color-acento-800: oklch(0.45 0.09 170);
+  --color-acento-900: oklch(0.34 0.06 170);
+  --color-acento-950: oklch(0.245 0.04 170);
+
+  --color-neutro-50: oklch(0.987 0.003 262);
+  --color-neutro-100: oklch(0.963 0.004 262);
+  --color-neutro-200: oklch(0.925 0.006 262);
+  --color-neutro-300: oklch(0.845 0.009 262);
+  --color-neutro-400: oklch(0.7 0.011 262);
+  --color-neutro-500: oklch(0.58 0.012 262);
+  --color-neutro-600: oklch(0.47 0.01 262);
+  --color-neutro-700: oklch(0.37 0.009 262);
+  --color-neutro-800: oklch(0.28 0.008 262);
+  --color-neutro-850: oklch(0.24 0.007 262);
+  --color-neutro-900: oklch(0.205 0.006 262);
+  --color-neutro-950: oklch(0.14 0.005 262);
+
+  --color-visita-300: oklch(0.8 0.14 20);
+  --color-visita-400: oklch(0.718 0.185 20);
+  --color-visita-500: oklch(0.637 0.215 20);
+  --color-visita-600: oklch(0.555 0.19 20);
+  --color-visita-700: oklch(0.475 0.145 20);
+
+  --color-empate-300: oklch(0.83 0.015 262);
+  --color-empate-400: oklch(0.72 0.02 262);
+  --color-empate-500: oklch(0.62 0.025 262);
+  --color-empate-700: oklch(0.44 0.015 262);
 }
 
 @layer base {
