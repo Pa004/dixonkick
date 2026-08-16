@@ -1,0 +1,17 @@
+{
+  "name": "FutbolTipster — Probabilidades de fútbol",
+  "short_name": "FutbolTipster",
+  "description": "Probabilidades 1X2 y mercados derivados con modelos estadísticos. Sin apuestas.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#14151b",
+  "theme_color": "#14151b",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
