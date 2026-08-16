@@ -6,6 +6,7 @@ import MatchCard from "./components/MatchCard";
 import SpotlightCard from "./components/SpotlightCard";
 import Countdown from "./components/Countdown";
 import ConfidenceBadge from "./components/ConfidenceBadge";
+import BandLegend from "./components/BandLegend";
 import { BAND_DOT } from "./bands";
 
 const FOCUS = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento-400";
@@ -163,6 +164,7 @@ export default function App() {
 
           <main className="mx-auto max-w-3xl px-4 py-6">
             {stats && stats.totalTracked > 0 && (
+              <>
               <div className="mb-5 flex flex-wrap gap-3 rounded-base border border-neutro-800/60 bg-neutro-900/60 p-4 text-xs">
                 <div className="flex items-center gap-2 text-neutro-400">
                   <TrendingUp className="h-4 w-4 text-acento-400" aria-hidden="true" />
@@ -190,6 +192,8 @@ export default function App() {
                     </span>
                   ))}
               </div>
+              <BandLegend />
+              </>
             )}
 
             {topPicks.length > 0 && (
