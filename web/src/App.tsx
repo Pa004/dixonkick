@@ -8,6 +8,7 @@ import Countdown from "./components/Countdown";
 import ConfidenceBadge from "./components/ConfidenceBadge";
 import BandLegend from "./components/BandLegend";
 import MatchToolbar, { type SortMode } from "./components/MatchToolbar";
+import ThemeToggle from "./components/ThemeToggle";
 import { BAND_DOT } from "./bands";
 
 const FOCUS = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento-400";
@@ -162,7 +163,9 @@ export default function App() {
                   Próximo partido en <Countdown target={nextMatch} />
                 </span>
               )}
-              <button
+              <div className="flex items-center gap-2">
+                <ThemeToggle />
+                <button
                 type="button"
                 onClick={() => !loading && load()}
                 aria-disabled={loading}
@@ -174,6 +177,7 @@ export default function App() {
                 />
                 {loading ? "Actualizando…" : "Actualizar"}
               </button>
+              </div>
             </div>
           </header>
 
