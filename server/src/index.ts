@@ -3,15 +3,18 @@ import cors from "cors";
 import express from "express";
 import cron from "node-cron";
 
-import { CORS_ORIGINS, ML_URL, PORT, SYNC_CRON } from "./config.js";
+import { CORS_ORIGINS, IS_PROD, ML_URL, PORT, SYNC_CRON, TRUST_PROXY } from "./config.js";
 import { db } from "./db.js";
 import { api } from "./routes/api.js";
 import { runSync } from "./services/predict.js";
 
 const app = express();
+app.disable("x-powered-by");
 
-// El deploy termina detrás de un proxy TLS; confiar un salto permite req.ip y req.secure reales
-app.set("trust proxy", 1);
+if (TRUST_PROXY) {
+  // El deploy termina detrás de un proxy TLS; confiar un salto permite req.ip y req.secure reales
+  app.set("trust proxy", 1);
+}
 
 // Cabeceras de seguridad (sin dependencias extra)
 app.use((req, res, next) => {
@@ -44,6 +47,14 @@ app.get("/health", (_req, res) => {
 
 app.use("/api", api);
 
+// Error middleware final: convierte cualquier error (incluidos rechazos de
+// handlers async) en JSON en lugar del stack HTML por defecto de Express.
+app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error("[error]", err instanceof Error ? err.stack : err);
+  const detail = IS_PROD ? "error interno" : String(err);
+  res.status(500).json({ error: detail });
+});
+
 async function waitForMl(retries = 24, delayMs = 5000): Promise<void> {
   for (let i = 0; i < retries; i++) {
     try {
@@ -60,8 +71,8 @@ async function waitForMl(retries = 24, delayMs = 5000): Promise<void> {
 
 async function tick() {
   try {
-    const { inserted, predicted, checked } = await runSync();
-    console.log(`[sync] inserted=${inserted} predicted=${predicted} checked=${checked}`);
+    const { processed, predicted, checked } = await runSync();
+    console.log(`[sync] processed=${processed} predicted=${predicted} checked=${checked}`);
   } catch (err) {
     console.error("[sync]", (err as Error).message);
   }

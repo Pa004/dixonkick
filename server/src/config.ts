@@ -21,3 +21,12 @@ export const CORS_ORIGINS = (process.env.CORS_ORIGINS ?? "")
   .filter(Boolean);
 
 export const REFRESH_TOKEN = process.env.REFRESH_TOKEN ?? "";
+
+export const IS_PROD = process.env.NODE_ENV === "production";
+
+// El deploy asume un proxy TLS delante; solo se confía en X-Forwarded-For si
+// se declara explícitamente, para no dejar el rate limit por IP a merced del cliente.
+export const TRUST_PROXY = process.env.TRUST_PROXY === "1";
+
+// Zona horaria de referencia para ventanas de fecha (fixtures "de hoy" y rango ESPN).
+export const TZ = process.env.TZ || "America/Guayaquil";

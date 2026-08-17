@@ -12,6 +12,10 @@ export default tseslint.config(
       ecmaVersion: 2020,
       globals: globals.node,
     },
+    rules: {
+      // El `_next` del error middleware de Express es obligatorio (firma de 4 args)
+      "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
+    },
   },
   prettier,
 );
