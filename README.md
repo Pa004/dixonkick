@@ -122,9 +122,10 @@ Hitos principales y qué se arregló:
 - **Backtest**: rentabilidad de los 14 mercados con cuotas sintéticas SBOBET. Corrigió bugs de asentamiento (el "más X" de conteos se asentaba con goles en vez de los conteos; doble oportunidad usaba un solo ganador en vez del conjunto; línea de hándicap 0.5→-0.5).
 - **Forma reciente**: covariable de media móvil (k=5) por equipo en los modelos de conteo. Corrigió la indexación de la forma al entrenar (acceso posicional vs por etiqueta en `rolling_form`).
 - **Robustez del server**: re-predice fixtures guardados con formato de predicción viejo; protección de `/api/refresh` con token + rate-limit; CORS y cabeceras de seguridad; sync tolerante a fallos de ESPN y ml-service.
-- **Observabilidad del sync**: el server persiste el motivo de cada predicción faltante (`skip_reason`: liga sin modelo, equipo sin datos, fallo del modelo) y el web lo explica con etiquetas precisas; un reintento inmediato absorbe fallas transitorias del ml-service.
+- **Observabilidad del sync**: el server persiste el motivo de cada predicción faltante (`skip_reason`: liga sin modelo, equipo sin datos, fallo del modelo, servicio de modelos caído) y el web lo explica con etiquetas precisas; un reintento inmediato absorbe fallas transitorias del ml-service.
 - **Calidad**: eslint/prettier (web y server) y ruff (ml-service); tests con vitest y pytest; lock de dependencias Python.
 - **Operación (Paso 7)**: re-predicción automática al reentrenar (el server compara `trained_at` del modelo y fuerza re-predicción de los partidos pendientes); cron de sync configurable (`SYNC_CRON`); CI en GitHub Actions (lint + tests en los 3 servicios). Las bandas de confianza pasan a tener una única fuente de verdad (`GET /bands` en el ml-service) y la UI degrada con elegancia si falta un modelo de mercado.
+- **Remediación de robustez (F1-F11)**: el server usa fechas locales (`TZ`), un solo query para `/api/stats`, fetches a ESPN en paralelo tolerante a fallos y respuestas JSON seguras; el ml-service excluye EC1 del modelo global, valida `/predict` con 422, carga artefactos sin `pickle` y centraliza la config de mercados; el web añade ErrorBoundary, timeout de red, tarjetas sin predicción no clicables, un solo `cn`, tabs accesibles (roving tabindex, Home/End) y corrige el contraste del tema claro. E2E responsive automatizado (51 checks en 7 anchos).
 
 ## Puesta en marcha
 
@@ -181,6 +182,8 @@ Ver `.env.example` (raíz) y `web/.env.example`.
 - `REFRESH_TOKEN`: token requerido por `POST /api/refresh`. Genera uno con:
   `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
 - `CORS_ORIGINS`: origenes permitidos separados por coma (vacío = todos, para dev)
+- `TZ` (server, default `America/Guayaquil`): zona horaria de las fechas locales. La ventana de fixtures y el filtro de `/api/fixtures` usan el día local (no UTC).
+- `TRUST_PROXY` (server, default off): confiar en `X-Forwarded-For` para el rate-limit. Solo activar detrás de un proxy real.
 - `VITE_API_URL` (web): en producción apunta al server; en dev no hace falta (proxy de Vite)
 
 ## API
@@ -194,7 +197,7 @@ Server (`/api`, puerto 4000):
 
 ml-service (puerto 8001):
 
-- `POST /predict` — predicción completa de un par de equipos: 1X2, HT, HT/FT, mercados de conteo, primer gol/córner
+- `POST /predict` — predicción completa de un par de equipos: 1X2, HT, HT/FT, mercados de conteo, primer gol/córner. Valida que los equipos no estén vacíos y que `league` sea `global` o `EC1` (422 en caso contrario)
 - `GET /teams?league=EC1` — equipos del modelo de una liga (sin league: modelo global)
 - `GET /health` — estado, nº de equipos y `trained_at` (timestamp del último entrenamiento)
 - `GET /models` — qué modelos hay cargados (ft, ft_ec1, ht, ht_ft_conditional, counts)
@@ -216,7 +219,8 @@ cd ml-service && python -m ruff check app tests scripts && python -m ruff format
 Smoke E2E del web (requiere el stack arriba: ml-service, server y el dev server del web):
 
 ```bash
-cd web && npm run test:e2e
+cd web && npm run test:e2e            # 7 checks funcionales
+cd web && npm run test:e2e:responsive  # 51 checks de layout en 7 anchos (320-1536px)
 ```
 
 Usa `playwright-core` con el Chrome/Edge del sistema (sin descargar navegadores). Verifica en navegador real: tabs de ligas, tarjetas con predicción, expansión del detalle, sección de mercados y ausencia de errores de consola.
@@ -265,7 +269,7 @@ ml-service/
     train.py                # entrena todo y guarda artifacts/*.npz
     validate.py             # walk-forward + baseline + skill
     backtest.py             # ROI por mercado y por banda
-  tests/                    # pytest (21 tests)
+  tests/                    # pytest (37 tests)
   data/, artifacts/         # gitignored; se regeneran con train.py
 server/
   src/
@@ -276,17 +280,20 @@ server/
     teams.ts                # resuelve nombres ESPN -> modelo
     providers/espn.ts       # cliente de la API de ESPN
     routes/api.ts           # /api/leagues, /api/fixtures, /api/stats, /api/refresh
+    dates.ts                # fechas locales (TZ) para la ventana y el filtro de fixtures
+    lib/json.ts             # helpers seguros de respuesta JSON
+    data/teamOverrides.ts   # alias ESPN -> nombre del modelo (fuente única)
     services/predict.ts     # orquesta predicción, hasMarkets, backfill, re-predicción por trained_at
 web/
   src/
     App.tsx, main.tsx, api.ts
     bands.ts                # umbrales y etiquetas de confianza
-    components/             # MatchCard, Markets, ProbabilityBar, ConfidenceBadge
+    components/             # MatchCard, Markets, ProbabilityBar, ConfidenceBadge, Header, Sidebar
 ```
 
 ## Límites
 
-- Solo 5 ligas tienen el modelo global (E0, SP1, I1, D1, F1); Liga Pro (EC1) usa un modelo Dixon-Coles por liga entrenado con histórico de ESPN (`dixon_coles_ec1.npz`).
+- Solo 5 ligas tienen el modelo global (E0, SP1, I1, D1, F1); Liga Pro (EC1) usa un modelo Dixon-Coles por liga entrenado con histórico de ESPN (`dixon_coles_ec1.npz`). El global se entrena **excluyendo EC1** (`GLOBAL_LEAGUES` en `ml-service/app/data.py`): mezclar la Liga Pro con las europeas degradaba el ajuste.
 - Liga Pro solo predice el marcador completo (FT): los mercados de conteo (corners, bookings, tiros, faltas) y el de primera mitad usan el baseline del modelo global.
 - Los equipos ascendidos de la Liga Pro recientes tienen parámetros débiles por poco histórico; el server marca `team_not_in_model` si no hay datos suficientes.
 - Las bandas de confianza son referencia, no certeza: los modelos de fútbol aciertan ~50-55% de los resultados.
