@@ -1,4 +1,4 @@
-import { LEAGUES } from "../config.js";
+import { isoDay } from "../dates.js";
 
 interface EspnEvent {
   id: string;
@@ -11,10 +11,6 @@ interface EspnEvent {
       team: { displayName: string; abbreviation: string; logo?: string; logos?: { href: string }[] };
     }[];
   }[];
-}
-
-function isoDay(offsetDays: number): string {
-  return new Date(Date.now() + offsetDays * 86_400_000).toISOString().slice(0, 10).replace(/-/g, "");
 }
 
 export async function fetchLeagueFixtures(espnLeague: string): Promise<
@@ -76,5 +72,3 @@ export async function fetchLeagueFixtures(espnLeague: string): Promise<
     })
     .filter((f): f is NonNullable<typeof f> => f !== null);
 }
-
-export const espnLeagues = Object.values(LEAGUES).map((l) => l.espn);

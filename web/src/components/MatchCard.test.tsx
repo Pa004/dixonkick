@@ -50,6 +50,7 @@ describe("MatchCard", () => {
     ["no_model", "Liga sin modelo de datos todavía"],
     ["team_not_in_model", "Equipo sin datos en el modelo"],
     ["predict_failed", "Predicción falló; se reintentará en el próximo sync"],
+    ["teams_unavailable", "Servicio de modelos temporalmente caído"],
   ] as const)("explica el motivo %s", (skipReason, label) => {
     render(<MatchCard fixture={{ ...baseFixture(), skipReason }} />);
     expect(screen.getByText(label)).toBeInTheDocument();

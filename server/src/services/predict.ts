@@ -1,16 +1,12 @@
 import { LEAGUES, ML_URL } from "../config.js";
 import { db } from "../db.js";
+import { safeJson } from "../lib/json.js";
 import { fetchLeagueFixtures } from "../providers/espn.js";
 import { resolveTeam } from "../teams.js";
 
 function hasMarkets(prediction: string | null | undefined): boolean {
-  if (!prediction) return false;
-  try {
-    const parsed = JSON.parse(prediction) as { markets?: unknown };
-    return parsed.markets !== undefined;
-  } catch {
-    return false;
-  }
+  const parsed = safeJson<{ markets?: unknown }>(prediction ?? "");
+  return parsed?.markets !== undefined;
 }
 
 const META_TRAINED_AT = "ml_trained_at";
@@ -27,9 +23,7 @@ async function fetchModelTrainedAt(): Promise<string | null> {
 }
 
 function getMeta(key: string): string | null {
-  const row = db.prepare("SELECT value FROM meta WHERE key = ?").get(key) as
-    | { value: string }
-    | undefined;
+  const row = db.prepare("SELECT value FROM meta WHERE key = ?").get(key) as { value: string } | undefined;
   return row?.value ?? null;
 }
 
@@ -50,6 +44,8 @@ export async function predictFixture(home: string, away: string, league: string)
   return (await res.json()) as object;
 }
 
+// Pool de workers con límite: el incremento de next++ es atómico porque no hay
+// await entre el chequeo y la reserva del índice, así ningún worker repite tarea.
 async function mapLimit<T>(items: T[], limit: number, fn: (item: T) => Promise<void>): Promise<void> {
   let next = 0;
   const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
@@ -61,21 +57,20 @@ async function mapLimit<T>(items: T[], limit: number, fn: (item: T) => Promise<v
   await Promise.all(workers);
 }
 
-export async function refreshFixtures(
-  force = false,
-): Promise<{ inserted: number; predicted: number }> {
-  let inserted = 0;
+export async function refreshFixtures(force = false): Promise<{ processed: number; predicted: number }> {
+  let processed = 0;
   const tasks: { id: string; home: string; away: string; league: string }[] = [];
 
-  for (const [code, league] of Object.entries(LEAGUES)) {
-    let fixtures;
-    try {
-      fixtures = await fetchLeagueFixtures(league.espn);
-    } catch (err) {
-      console.error(`[sync] ${code} (${league.espn}) falló: ${(err as Error).message}`);
+  const entries = Object.entries(LEAGUES);
+  const settled = await Promise.allSettled(entries.map(([, league]) => fetchLeagueFixtures(league.espn)));
+  for (let i = 0; i < settled.length; i++) {
+    const [code, league] = entries[i];
+    const result = settled[i];
+    if (result.status === "rejected") {
+      console.error(`[sync] ${code} (${league.espn}) falló: ${(result.reason as Error).message}`);
       continue;
     }
-    for (const fx of fixtures) {
+    for (const fx of result.value) {
       const existing = db.prepare("SELECT home_model, prediction FROM fixtures WHERE id = ?").get(fx.id) as
         { home_model: string | null; prediction: string | null } | undefined;
       // Liga sin modelo: se guarda la razón para que el web explique el estado
@@ -105,7 +100,7 @@ export async function refreshFixtures(
         fx.awayScore,
         skipReason,
       );
-      inserted++;
+      processed++;
 
       // force = modelo reentrenado: re-predice aunque la predicción ya tenga markets
       if (fx.status === "pre" && league.model && (force || !hasMarkets(existing?.prediction))) {
@@ -116,14 +111,24 @@ export async function refreshFixtures(
 
   let predicted = 0;
   await mapLimit(tasks, 5, async ({ id, home, away, league: code }) => {
+    let homeModel: string | null;
+    let awayModel: string | null;
     try {
-      const homeModel = await resolveTeam(home, code);
-      const awayModel = await resolveTeam(away, code);
-      if (!homeModel || !awayModel) {
-        // el modelo no tiene datos de alguno de los equipos; sin reintentos que lo arreglen
-        db.prepare("UPDATE fixtures SET skip_reason='team_not_in_model' WHERE id=?").run(id);
-        return;
-      }
+      homeModel = await resolveTeam(home, code);
+      awayModel = await resolveTeam(away, code);
+    } catch (err) {
+      // El ml-service no pudo resolver equipos (caído o sin caché); es distinto
+      // de un fallo de predicción y se diagnostica con su propio skip_reason.
+      db.prepare("UPDATE fixtures SET skip_reason='teams_unavailable' WHERE id=?").run(id);
+      console.error(`[sync] equipos ${id} (${home} vs ${away}) no disponibles: ${(err as Error).message}`);
+      return;
+    }
+    if (!homeModel || !awayModel) {
+      // el modelo no tiene datos de alguno de los equipos; sin reintentos que lo arreglen
+      db.prepare("UPDATE fixtures SET skip_reason='team_not_in_model' WHERE id=?").run(id);
+      return;
+    }
+    try {
       const pred = await predictWithRetry(homeModel, awayModel, code);
       db.prepare(
         "UPDATE fixtures SET home_model=?, away_model=?, prediction=?, skip_reason=NULL, predicted_at=datetime('now') WHERE id=?",
@@ -143,7 +148,7 @@ export async function refreshFixtures(
     summary.map((s) => `${s.skip_reason ?? "predicha"}=${s.n}`).join(", "),
   );
 
-  return { inserted, predicted };
+  return { processed, predicted };
 }
 
 // Un reintento inmediato absorbe latencias transitorias del ml-service sin bloquear el sync
@@ -157,18 +162,18 @@ async function predictWithRetry(home: string, away: string, league: string): Pro
 
 let syncing = false;
 
-export async function runSync(): Promise<{ inserted: number; predicted: number; checked: number }> {
-  if (syncing) return { inserted: 0, predicted: 0, checked: 0 };
+export async function runSync(): Promise<{ processed: number; predicted: number; checked: number }> {
+  if (syncing) return { processed: 0, predicted: 0, checked: 0 };
   syncing = true;
   try {
     const trainedAt = await fetchModelTrainedAt();
     // Si el modelo se reentrenó, las predicciones guardadas quedan obsoletas:
     // forzar re-predicción de todos los partidos pendientes.
     const force = trainedAt != null && trainedAt !== getMeta(META_TRAINED_AT);
-    const { inserted, predicted } = await refreshFixtures(force);
+    const { processed, predicted } = await refreshFixtures(force);
     if (trainedAt != null) setMeta(META_TRAINED_AT, trainedAt);
     const checked = checkResults();
-    return { inserted, predicted, checked };
+    return { processed, predicted, checked };
   } finally {
     syncing = false;
   }
@@ -187,9 +192,14 @@ export function checkResults(): number {
   }[];
 
   let checked = 0;
+  // ON CONFLICT re-asienta: si el modelo se reentrenó o ESPN corrige un marcador,
+  // el historial se actualiza en vez de quedar congelado con INSERT OR IGNORE.
   const update = db.prepare(`
-    INSERT OR IGNORE INTO tracked (fixture_id, pick, confidence, outcome, hit, resolved_at)
+    INSERT INTO tracked (fixture_id, pick, confidence, outcome, hit, resolved_at)
     VALUES (?, ?, ?, ?, ?, datetime('now'))
+    ON CONFLICT(fixture_id) DO UPDATE SET
+      pick=excluded.pick, confidence=excluded.confidence,
+      outcome=excluded.outcome, hit=excluded.hit, resolved_at=excluded.resolved_at
   `);
   for (const fx of pending) {
     let pred: { pick: string; confidence: { probability: number } };
@@ -200,8 +210,17 @@ export function checkResults(): number {
       db.prepare("UPDATE fixtures SET result_checked=1 WHERE id=?").run(fx.id);
       continue;
     }
+    const { pick, confidence } = pred;
+    const validPick = pick === "H" || pick === "D" || pick === "A";
+    const validConfidence =
+      typeof confidence?.probability === "number" && Number.isFinite(confidence.probability);
+    if (!validPick || !validConfidence) {
+      // predicción malformada: no debe abortar el resto del chequeo
+      db.prepare("UPDATE fixtures SET result_checked=1 WHERE id=?").run(fx.id);
+      continue;
+    }
     const outcome = fx.home_score > fx.away_score ? "H" : fx.home_score < fx.away_score ? "A" : "D";
-    update.run(fx.id, pred.pick, pred.confidence.probability, outcome, pred.pick === outcome ? 1 : 0);
+    update.run(fx.id, pick, confidence.probability, outcome, pick === outcome ? 1 : 0);
     db.prepare("UPDATE fixtures SET result_checked=1 WHERE id=?").run(fx.id);
     checked++;
   }

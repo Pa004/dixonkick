@@ -127,9 +127,9 @@ describe("runSync", () => {
     release!();
     const [r1, r2] = await Promise.all([first, second]);
 
-    expect(r2).toEqual({ inserted: 0, predicted: 0, checked: 0 });
+    expect(r2).toEqual({ processed: 0, predicted: 0, checked: 0 });
     expect(espnCalls).toBe(LEAGUES.length);
-    expect(r1.inserted).toBeGreaterThanOrEqual(0);
+    expect(r1.processed).toBeGreaterThanOrEqual(0);
   });
 
   it("re-predice al detectar un cambio de trained_at del modelo", async () => {
@@ -203,7 +203,7 @@ describe("refreshFixtures", () => {
     teamsMock.mockResolvedValue(null);
 
     const result = await predict.refreshFixtures();
-    expect(result.inserted).toBeGreaterThanOrEqual(1);
+    expect(result.processed).toBeGreaterThanOrEqual(1);
   });
 
   it("persiste la predicción cuando los equipos resuelven", async () => {
@@ -336,6 +336,18 @@ describe("refreshFixtures", () => {
       skip_reason: string | null;
     };
     expect(row.skip_reason).toBe("predict_failed");
+  });
+
+  it("marca teams_unavailable cuando resolver equipos falla y no hay caché", async () => {
+    espnMock.mockImplementation(async (espnLeague) => (espnLeague === "eng.1" ? [fixture("epl-uteams")] : []));
+    teamsMock.mockRejectedValue(new Error("ml-service /teams: 503"));
+
+    const result = await predict.refreshFixtures();
+    expect(result.predicted).toBe(0);
+    const row = db.prepare("SELECT skip_reason FROM fixtures WHERE id='epl-uteams'").get() as {
+      skip_reason: string | null;
+    };
+    expect(row.skip_reason).toBe("teams_unavailable");
   });
 
   it("borra skip_reason al conseguir la predicción", async () => {

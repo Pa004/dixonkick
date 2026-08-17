@@ -1,9 +1,12 @@
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { dirname } from "node:path";
 import { DB_PATH } from "./config.js";
 
-mkdirSync(fileURLToPath(new URL("../data/", import.meta.url)), { recursive: true });
+// Solo se crea el directorio cuando la BD es un archivo real (no :memory: en tests)
+if (DB_PATH !== ":memory:") {
+  mkdirSync(dirname(DB_PATH), { recursive: true });
+}
 
 export const db = new DatabaseSync(DB_PATH);
 
