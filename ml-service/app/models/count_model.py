@@ -86,7 +86,9 @@ def _nll_grad(
     gamma, beta_form, alpha_od = p[1 + 2 * free], p[2 + 2 * free], p[3 + 2 * free]
     att = np.concatenate([[0.0], attack_free])
     de = np.concatenate([[0.0], defense_free])
-    lam_h = np.exp(np.clip(mu + att[i_home] + de[i_away] + gamma + beta_form * home_form, -700, 700))
+    lam_h = np.exp(
+        np.clip(mu + att[i_home] + de[i_away] + gamma + beta_form * home_form, -700, 700)
+    )
     lam_a = np.exp(np.clip(mu + att[i_away] + de[i_home] + beta_form * away_form, -700, 700))
     r = 1.0 / alpha_od
     like_h = np.clip(nbinom.pmf(home_count, r, r / (r + lam_h)), 1e-12, None)

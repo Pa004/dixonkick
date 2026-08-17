@@ -32,7 +32,7 @@ OUT_COLS = ["Div", "Date", "HomeTeam", "AwayTeam", "FTHG", "FTAG"]
 def month_range(year: int, month: int) -> str:
     """'YYYYMMDD' del primer y ultimo dia del mes."""
     first = date(year, month, 1)
-    last = (date(year + month // 12, month % 12 + 1, 1) - timedelta(days=1))
+    last = date(year + month // 12, month % 12 + 1, 1) - timedelta(days=1)
     fmt = "%Y%m%d"
     return f"{first.strftime(fmt)}-{last.strftime(fmt)}"
 

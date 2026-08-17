@@ -27,6 +27,7 @@ def test_seasons_from_data(data: pd.DataFrame) -> list[int]:
         raise SystemExit(f"necesitas al menos 4 temporadas para el walk-forward; hay {len(years)}")
     return years[-3:]
 
+
 COUNT_COLS: dict[str, tuple[str, str]] = {
     "corners": EVENT_COLS["corners"],
     "bookings": (BOOKINGS_HOME, BOOKINGS_AWAY),

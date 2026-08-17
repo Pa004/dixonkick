@@ -119,8 +119,12 @@ def test_gradiente_coincide_con_diferencias_finitas():
     for i in range(len(p)):
         dp = np.zeros_like(p)
         dp[i] = eps
-        f_hi, _ = _nll_grad(p + dp, i_home, i_away, home_form, away_form, ch, ca, weights, len(teams))
-        f_lo, _ = _nll_grad(p - dp, i_home, i_away, home_form, away_form, ch, ca, weights, len(teams))
+        f_hi, _ = _nll_grad(
+            p + dp, i_home, i_away, home_form, away_form, ch, ca, weights, len(teams)
+        )
+        f_lo, _ = _nll_grad(
+            p - dp, i_home, i_away, home_form, away_form, ch, ca, weights, len(teams)
+        )
         numeric[i] = (f_hi - f_lo) / (2 * eps)
 
     rel_err = np.abs(grad - numeric) / (np.abs(numeric) + 1e-9)
