@@ -279,7 +279,7 @@ export default function App() {
                       {!l.hasModel && <span className="text-neutro-500">sin modelo</span>}
                       {(countByLeague.get(l.code) ?? 0) > 0 && (
                         <span
-                          className={`rounded-full px-1.5 py-0.5 text-[10px] tabular-nums ${
+                          className={`rounded-full px-1.5 py-0.5 text-2xs tabular-nums ${
                             activeCode === l.code ? "bg-neutro-950/20 text-neutro-950" : "bg-neutro-800 text-neutro-300"
                           }`}
                         >

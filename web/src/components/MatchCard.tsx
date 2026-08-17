@@ -74,7 +74,7 @@ function TeamSide({
   return (
     <div
       className={cn(
-        "flex flex-1 items-center gap-3 rounded-base px-2 py-1.5 transition-colors",
+        "flex min-w-0 flex-1 items-center gap-3 rounded-base px-2 py-1.5 transition-colors",
         align === "right" && "justify-end text-right",
         picked ? "bg-acento-500/10 ring-1 ring-acento-500/40" : "ring-1 ring-transparent",
       )}
@@ -90,7 +90,7 @@ function TeamSide({
           {name}
         </span>
         {picked && (
-          <span className="mt-0.5 inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-acento-300">
+          <span className="mt-0.5 inline-flex items-center gap-1 text-2xs font-semibold uppercase tracking-wide text-acento-300">
             <Target className="h-3 w-3" aria-hidden="true" /> Favorito
           </span>
         )}
