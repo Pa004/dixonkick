@@ -1,3 +1,5 @@
+> Documentación técnica completa (español). Presentación del proyecto en [README.md](README.md).
+
 # FutbolTipster
 
 Predicciones 1X2 y mercados derivados de fútbol con modelos estadísticos (Dixon-Coles y Negativo-Binomial). Sin apuestas: muestra probabilidades y bandas de confianza como referencia.
