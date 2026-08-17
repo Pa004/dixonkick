@@ -116,9 +116,12 @@ export interface Stats {
 }
 
 const BASE = import.meta.env.VITE_API_URL ?? "/api";
+const REQUEST_TIMEOUT_MS = 10_000;
 
 async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`);
+  // El proxy de Vite no respeta timeouts de fetch; AbortSignal.timeout corta
+  // peticiones colgadas para que el estado de error se muestre pronto.
+  const res = await fetch(`${BASE}${path}`, { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
   if (!res.ok) throw new Error(`${path}: ${res.status}`);
   return res.json() as Promise<T>;
 }

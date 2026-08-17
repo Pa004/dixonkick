@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { memo, useState } from "react";
 import { AnimatePresence, m, useReducedMotion } from "motion/react";
 import { CalendarDays, ChevronDown, Gauge, Target } from "lucide-react";
 import type { Fixture, Prediction } from "../api";
@@ -101,14 +101,21 @@ function TeamSide({
   );
 }
 
-export default function MatchCard({ fixture }: { fixture: Fixture }) {
+export default memo(function MatchCard({ fixture }: { fixture: Fixture }) {
   const [open, setOpen] = useState(false);
   const [matrixOpen, setMatrixOpen] = useState(true);
   const shouldReduce = useReducedMotion();
   const pred = fixture.prediction;
+  // La fecha puede llegar malformada si ESPN entrega datos inconsistentes;
+  // en ese caso se muestra el valor crudo en lugar de "Invalid Date".
   const d = new Date(fixture.date);
-  const dateStr = d.toLocaleDateString("es-EC", { weekday: "short", day: "2-digit", month: "short" });
-  const timeStr = d.toLocaleTimeString("es-EC", { hour: "2-digit", minute: "2-digit" });
+  const validDate = !Number.isNaN(d.getTime());
+  const dateStr = validDate
+    ? d.toLocaleDateString("es-EC", { weekday: "short", day: "2-digit", month: "short" })
+    : fixture.date;
+  const timeStr = validDate
+    ? d.toLocaleTimeString("es-EC", { hour: "2-digit", minute: "2-digit" })
+    : "";
 
   const detail = pred && (
     <div id={`detail-${fixture.id}`} className="border-t border-neutro-800/60 p-5 pt-4">
@@ -153,105 +160,116 @@ export default function MatchCard({ fixture }: { fixture: Fixture }) {
   const pick = pred?.pick;
   const pickedHome = pick === "H";
   const pickedAway = pick === "A";
+  const expandable = Boolean(pred);
+
+  const inner = (
+    <>
+      <span className="sr-only">
+        Partido {fixture.home} contra {fixture.away}
+      </span>
+      <div className="flex items-center justify-between text-xs text-neutro-400">
+        <span className="inline-flex items-center gap-1.5 uppercase tracking-wide">
+          <CalendarDays className="h-3.5 w-3.5" aria-hidden="true" />
+          {dateStr} · {timeStr}
+        </span>
+        <span className="font-semibold text-neutro-400">{fixture.league}</span>
+      </div>
+
+      <div className="flex items-center justify-between gap-2">
+        <TeamSide
+          name={fixture.home}
+          short={fixture.homeShort}
+          logo={fixture.homeLogo}
+          picked={pickedHome}
+          align="left"
+        />
+        <span className="shrink-0 px-1 font-display text-xs font-bold text-neutro-500">vs</span>
+        <TeamSide
+          name={fixture.away}
+          short={fixture.awayShort}
+          logo={fixture.awayLogo}
+          picked={pickedAway}
+          align="right"
+        />
+      </div>
+
+      {fixture.status !== "pre" &&
+      fixture.homeScore != null &&
+      fixture.awayScore != null ? (
+        <div className="flex items-center justify-between gap-3">
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${
+              fixture.status === "post"
+                ? "bg-neutro-800 text-neutro-300"
+                : "bg-acento-400 text-neutro-950"
+            }`}
+          >
+            <span
+              aria-hidden="true"
+              className={`h-1.5 w-1.5 rounded-full ${
+                fixture.status === "post" ? "bg-neutro-500" : "animate-pulse bg-neutro-950"
+              }`}
+            />
+            {fixture.status === "post" ? "Finalizado" : "En vivo"}
+          </span>
+          <span className="font-display text-xl font-bold tabular-nums text-neutro-100">
+            {fixture.homeScore}-{fixture.awayScore}
+          </span>
+        </div>
+      ) : pred ? (
+        <div className="flex flex-col gap-2">
+          <ProbabilityBar
+            home={pred.probabilities.home}
+            draw={pred.probabilities.draw}
+            away={pred.probabilities.away}
+            pick={pick}
+          />
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+            <div className="flex gap-3 text-neutro-400">
+              <span>
+                Marcador:{" "}
+                <b className="font-display tabular-nums text-neutro-100">
+                  {pred.scoreline.home}-{pred.scoreline.away}
+                </b>
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <Target className="h-3.5 w-3.5" aria-hidden="true" />
+                Favorito: <b className="text-neutro-100">{PICK_LABEL[pred.pick]}</b>
+              </span>
+              <span>
+                Over 2.5:{" "}
+                <b className="font-display tabular-nums text-neutro-100">
+                  {Math.round(pred.over_25 * 100)}%
+                </b>
+              </span>
+            </div>
+            <ConfidenceBadge confidence={pred.confidence} />
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center justify-center gap-2 rounded-base bg-neutro-850 py-2 text-xs text-neutro-400">
+          <Gauge className="h-4 w-4" aria-hidden="true" />
+          {SKIP_LABEL[fixture.skipReason ?? ""] ?? "Sin datos suficientes para predecir este duelo"}
+        </div>
+      )}
+    </>
+  );
 
   return (
     <div className="rounded-base bg-neutro-900 shadow-card transition-shadow duration-200 hover:shadow-glow">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        aria-controls={pred ? `detail-${fixture.id}` : undefined}
-        className="flex w-full flex-col gap-3 rounded-base p-5 text-left transition-colors hover:bg-neutro-850/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento-400"
-      >
-        <span className="sr-only">
-          Partido {fixture.home} contra {fixture.away}
-        </span>
-        <div className="flex items-center justify-between text-xs text-neutro-400">
-          <span className="inline-flex items-center gap-1.5 uppercase tracking-wide">
-            <CalendarDays className="h-3.5 w-3.5" aria-hidden="true" />
-            {dateStr} · {timeStr}
-          </span>
-          <span className="font-semibold text-neutro-400">{fixture.league}</span>
-        </div>
-
-        <div className="flex items-center justify-between gap-2">
-          <TeamSide
-            name={fixture.home}
-            short={fixture.homeShort}
-            logo={fixture.homeLogo}
-            picked={pickedHome}
-            align="left"
-          />
-          <span className="shrink-0 px-1 font-display text-xs font-bold text-neutro-500">vs</span>
-          <TeamSide
-            name={fixture.away}
-            short={fixture.awayShort}
-            logo={fixture.awayLogo}
-            picked={pickedAway}
-            align="right"
-          />
-        </div>
-
-        {fixture.status !== "pre" &&
-        fixture.homeScore != null &&
-        fixture.awayScore != null ? (
-          <div className="flex items-center justify-between gap-3">
-            <span
-              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${
-                fixture.status === "post"
-                  ? "bg-neutro-800 text-neutro-300"
-                  : "bg-acento-400 text-neutro-950"
-              }`}
-            >
-              <span
-                aria-hidden="true"
-                className={`h-1.5 w-1.5 rounded-full ${
-                  fixture.status === "post" ? "bg-neutro-500" : "animate-pulse bg-neutro-950"
-                }`}
-              />
-              {fixture.status === "post" ? "Finalizado" : "En vivo"}
-            </span>
-            <span className="font-display text-xl font-bold tabular-nums text-neutro-100">
-              {fixture.homeScore}-{fixture.awayScore}
-            </span>
-          </div>
-        ) : pred ? (
-          <div className="flex flex-col gap-2">
-            <ProbabilityBar
-              home={pred.probabilities.home}
-              draw={pred.probabilities.draw}
-              away={pred.probabilities.away}
-              pick={pick}
-            />
-            <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-              <div className="flex gap-3 text-neutro-400">
-                <span>
-                  Marcador:{" "}
-                  <b className="font-display tabular-nums text-neutro-100">
-                    {pred.scoreline.home}-{pred.scoreline.away}
-                  </b>
-                </span>
-                <span className="inline-flex items-center gap-1">
-                  <Target className="h-3.5 w-3.5" aria-hidden="true" />
-                  Favorito: <b className="text-neutro-100">{PICK_LABEL[pred.pick]}</b>
-                </span>
-                <span>
-                  Over 2.5:{" "}
-                  <b className="font-display tabular-nums text-neutro-100">
-                    {Math.round(pred.over_25 * 100)}%
-                  </b>
-                </span>
-              </div>
-              <ConfidenceBadge confidence={pred.confidence} />
-            </div>
-          </div>
-        ) : (
-          <div className="flex items-center justify-center gap-2 rounded-base bg-neutro-850 py-2 text-xs text-neutro-400">
-            <Gauge className="h-4 w-4" aria-hidden="true" />
-            {SKIP_LABEL[fixture.skipReason ?? ""] ?? "Sin datos suficientes para predecir este duelo"}
-          </div>
-        )}
-      </button>
+      {expandable ? (
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          aria-controls={`detail-${fixture.id}`}
+          className="flex w-full flex-col gap-3 rounded-base p-5 text-left transition-colors hover:bg-neutro-850/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento-400"
+        >
+          {inner}
+        </button>
+      ) : (
+        <div className="flex w-full flex-col gap-3 rounded-base p-5 text-left">{inner}</div>
+      )}
 
       {shouldReduce && open && detail}
 
@@ -271,4 +289,4 @@ export default function MatchCard({ fixture }: { fixture: Fixture }) {
       </AnimatePresence>
     </div>
   );
-}
+});

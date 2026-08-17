@@ -34,6 +34,7 @@ export default function TeamCrest({ name, short, logo, className, imgClassName, 
           src={logo!}
           alt=""
           loading="lazy"
+          referrerPolicy="no-referrer"
           onError={() => setFailed(true)}
           className={cn("h-full w-full object-contain p-1", imgClassName)}
         />
