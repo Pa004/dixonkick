@@ -49,7 +49,7 @@ cd web
 npm install && npm run dev   # http://localhost:5173
 ```
 
-Full setup guide, environment variables, API reference and data/training pipeline: [README.es.md](README.es.md) (Spanish).
+Environment variables are documented in `.env.example`; API endpoints and the data/training pipeline are documented in the source of each service (`server/`, `ml-service/`, `web/`).
 
 ## Validation & honesty
 
