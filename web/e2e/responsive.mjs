@@ -79,6 +79,45 @@ for (const width of VIEWPORTS) {
 
     check(`${ctx} sin errores de consola`, consoleErrors.length === 0, consoleErrors.slice(0, 2).join(" | "));
 
+    const tabs = await page.evaluate(() => {
+      const el = document.querySelector('[role="tablist"]');
+      return {
+        scrollable: el.scrollWidth > el.clientWidth,
+        scrollLeft: el.scrollLeft,
+        scrollWidth: el.scrollWidth,
+        clientWidth: el.clientWidth,
+        leftFade: !!document.querySelector(".bg-gradient-to-r.from-neutro-950"),
+        rightFade: !!document.querySelector(".bg-gradient-to-l.from-neutro-950"),
+      };
+    });
+    check(`${ctx} tablist scrolleable si hay desborde`, tabs.scrollable || tabs.scrollWidth <= tabs.clientWidth);
+
+    if (tabs.scrollable) {
+      check(`${ctx} fade derecho visible al inicio`, tabs.rightFade);
+      check(`${ctx} sin fade izquierdo al inicio`, !tabs.leftFade);
+
+      await page.getByRole("tab", { name: /Liga Pro/ }).click();
+      await page.waitForTimeout(700);
+      const after = await page.evaluate(() => {
+        const el = document.querySelector('[role="tablist"]');
+        const tab = el.querySelector('[aria-selected="true"]');
+        const tr = tab.getBoundingClientRect();
+        const cr = el.getBoundingClientRect();
+        return {
+          scrollLeft: el.scrollLeft,
+          visible: tr.left >= cr.left - 1 && tr.right <= cr.right + 1,
+          leftFade: !!document.querySelector(".bg-gradient-to-r.from-neutro-950"),
+        };
+      });
+      check(
+        `${ctx} tab activo visible tras seleccionar la última liga`,
+        after.visible,
+        `scrollLeft ${tabs.scrollLeft}→${after.scrollLeft}`,
+      );
+      check(`${ctx} auto-scroll mueve el tablist`, after.scrollLeft > tabs.scrollLeft);
+      check(`${ctx} fade izquierdo aparece al desplazarse`, after.leftFade);
+    }
+
     await page.screenshot({ path: `${OUT}/screenshots/responsive-${width}.png`, fullPage: true });
   } catch (err) {
     check(`${ctx} flujo completado: ${String(err).slice(0, 200)}`, false);

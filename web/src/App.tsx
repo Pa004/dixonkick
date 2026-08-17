@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, LazyMotion, MotionConfig, domAnimation, m } from "motion/react";
 import { Activity, Clock3, RotateCw, ShieldAlert, Sparkles, TrendingUp } from "lucide-react";
 import { fetchFixtures, fetchLeagues, fetchStats, type Fixture, type League, type Stats } from "./api";
@@ -52,6 +52,8 @@ export default function App() {
   const [nextMatch, setNextMatch] = useState<number | null>(null);
   const [sort, setSort] = useState<SortMode>("date");
   const [onlyPredicted, setOnlyPredicted] = useState(false);
+  const [tabsEdge, setTabsEdge] = useState<{ left: boolean; right: boolean }>({ left: false, right: false });
+  const tabsRef = useRef<HTMLDivElement | null>(null);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -142,6 +144,35 @@ export default function App() {
       document.getElementById(`tab-${leagues[next].code}`)?.focus();
     }
   };
+
+  const updateTabsEdge = useCallback(() => {
+    const el = tabsRef.current;
+    if (!el) return;
+    setTabsEdge({
+      left: el.scrollLeft > 4,
+      right: el.scrollLeft + el.clientWidth < el.scrollWidth - 4,
+    });
+  }, []);
+
+  // Los fades de los bordes solo aparecen cuando hay más tabs ocultos en esa dirección
+  useEffect(() => {
+    updateTabsEdge();
+    window.addEventListener("resize", updateTabsEdge);
+    return () => window.removeEventListener("resize", updateTabsEdge);
+  }, [updateTabsEdge, leagues.length]);
+
+  // Al cambiar de liga, garantiza que el tab activo quede visible sin mover la página
+  useEffect(() => {
+    const el = tabsRef.current;
+    const tab = document.getElementById(`tab-${activeCode}`);
+    if (!el || !tab || el.scrollWidth <= el.clientWidth) return;
+    const tr = tab.getBoundingClientRect();
+    const cr = el.getBoundingClientRect();
+    const visible = tr.left >= cr.left && tr.right <= cr.right;
+    if (!visible) {
+      tab.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+    }
+  }, [activeCode]);
 
   return (
     <MotionConfig reducedMotion="user">
@@ -254,40 +285,56 @@ export default function App() {
               </aside>
 
               <div className="min-w-0">
-                <div
-                  role="tablist"
-                  aria-label="Ligas"
-                  onKeyDown={onTabKeyDown}
-                  className="mb-5 flex gap-2 overflow-x-auto pb-1"
-                >
-                  {leagues.map((l) => (
-                    <button
-                      key={l.code}
-                      id={`tab-${l.code}`}
-                      type="button"
-                      role="tab"
-                      aria-selected={activeCode === l.code}
-                      aria-controls="panel-ligas"
-                      onClick={() => setActive(l.code)}
-                      className={`inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold transition-colors ${FOCUS} ${
-                        activeCode === l.code
-                          ? "bg-acento-400 text-neutro-950"
-                          : "bg-neutro-900 text-neutro-400 ring-1 ring-neutro-800 hover:text-neutro-200"
-                      }`}
-                    >
-                      {l.label}
-                      {!l.hasModel && <span className="text-neutro-500">sin modelo</span>}
-                      {(countByLeague.get(l.code) ?? 0) > 0 && (
-                        <span
-                          className={`rounded-full px-1.5 py-0.5 text-2xs tabular-nums ${
-                            activeCode === l.code ? "bg-neutro-950/20 text-neutro-950" : "bg-neutro-800 text-neutro-300"
-                          }`}
-                        >
-                          {countByLeague.get(l.code)}
-                        </span>
-                      )}
-                    </button>
-                  ))}
+                <div className="relative">
+                  <div
+                    ref={tabsRef}
+                    role="tablist"
+                    aria-label="Ligas"
+                    onKeyDown={onTabKeyDown}
+                    onScroll={updateTabsEdge}
+                    className="mb-5 flex gap-2 overflow-x-auto pb-1 [scrollbar-color:var(--color-neutro-700)_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-neutro-700 [&::-webkit-scrollbar-track]:bg-transparent"
+                  >
+                    {leagues.map((l) => (
+                      <button
+                        key={l.code}
+                        id={`tab-${l.code}`}
+                        type="button"
+                        role="tab"
+                        aria-selected={activeCode === l.code}
+                        aria-controls="panel-ligas"
+                        onClick={() => setActive(l.code)}
+                        className={`inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold transition-colors ${FOCUS} ${
+                          activeCode === l.code
+                            ? "bg-acento-400 text-neutro-950"
+                            : "bg-neutro-900 text-neutro-400 ring-1 ring-neutro-800 hover:text-neutro-200"
+                        }`}
+                      >
+                        {l.label}
+                        {!l.hasModel && <span className="text-neutro-500">sin modelo</span>}
+                        {(countByLeague.get(l.code) ?? 0) > 0 && (
+                          <span
+                            className={`rounded-full px-1.5 py-0.5 text-2xs tabular-nums ${
+                              activeCode === l.code ? "bg-neutro-950/20 text-neutro-950" : "bg-neutro-800 text-neutro-300"
+                            }`}
+                          >
+                            {countByLeague.get(l.code)}
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                  {tabsEdge.left && (
+                    <div
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-y-0 left-0 z-10 w-5 bg-gradient-to-r from-neutro-950 to-transparent sm:w-8"
+                    />
+                  )}
+                  {tabsEdge.right && (
+                    <div
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-y-0 right-0 z-10 w-5 bg-gradient-to-l from-neutro-950 to-transparent sm:w-8"
+                    />
+                  )}
                 </div>
 
                 {!loading && !error && shown.length > 0 && (
