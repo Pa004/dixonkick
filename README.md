@@ -126,6 +126,7 @@ Hitos principales y qué se arregló:
 - **Calidad**: eslint/prettier (web y server) y ruff (ml-service); tests con vitest y pytest; lock de dependencias Python.
 - **Operación (Paso 7)**: re-predicción automática al reentrenar (el server compara `trained_at` del modelo y fuerza re-predicción de los partidos pendientes); cron de sync configurable (`SYNC_CRON`); CI en GitHub Actions (lint + tests en los 3 servicios). Las bandas de confianza pasan a tener una única fuente de verdad (`GET /bands` en el ml-service) y la UI degrada con elegancia si falta un modelo de mercado.
 - **Remediación de robustez (F1-F11)**: el server usa fechas locales (`TZ`), un solo query para `/api/stats`, fetches a ESPN en paralelo tolerante a fallos y respuestas JSON seguras; el ml-service excluye EC1 del modelo global, valida `/predict` con 422, carga artefactos sin `pickle` y centraliza la config de mercados; el web añade ErrorBoundary, timeout de red, tarjetas sin predicción no clicables, un solo `cn`, tabs accesibles (roving tabindex, Home/End) y corrige el contraste del tema claro. E2E responsive automatizado (51 checks en 7 anchos).
+- **CI del ml-service verde**: el job fallaba en `pip install -r requirements.lock` porque `scipy==1.18.0` no tiene wheels para Python 3.11; se sube el CI a Python 3.13 (igual al entorno dev) y se declara `httpx` en el lock (lo exige `fastapi.testclient` para correr los tests). Los tres jobs (server, web, ml-service) pasan.
 
 ## Puesta en marcha
 
