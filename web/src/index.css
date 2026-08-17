@@ -9,7 +9,7 @@
   --font-sans: "Geist", system-ui, sans-serif;
   --font-display: "Sora", "Geist", sans-serif;
 
-  --text-2xs: clamp(0.5625rem, 0.52rem + 0.2vw, 0.65rem);
+  --text-2xs: clamp(0.625rem, 0.58rem + 0.2vw, 0.6875rem);
   --text-xs: clamp(0.6875rem, 0.62rem + 0.25vw, 0.8125rem);
   --text-sm: clamp(0.8125rem, 0.73rem + 0.35vw, 0.9375rem);
   --text-base: clamp(0.9375rem, 0.83rem + 0.45vw, 1.0625rem);
@@ -31,9 +31,9 @@
   --color-neutro-50: oklch(0.15 0.005 262);
   --color-neutro-100: oklch(0.25 0.008 262);
   --color-neutro-200: oklch(0.35 0.009 262);
-  --color-neutro-300: oklch(0.45 0.01 262);
-  --color-neutro-400: oklch(0.55 0.011 262);
-  --color-neutro-500: oklch(0.65 0.011 262);
+  --color-neutro-300: oklch(0.38 0.009 262);
+  --color-neutro-400: oklch(0.42 0.01 262);
+  --color-neutro-500: oklch(0.46 0.011 262);
   --color-neutro-600: oklch(0.75 0.009 262);
   --color-neutro-700: oklch(0.85 0.007 262);
   --color-neutro-800: oklch(0.9 0.005 262);
