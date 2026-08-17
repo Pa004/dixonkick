@@ -21,7 +21,7 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from app.data import BOOKINGS_AWAY, BOOKINGS_HOME, EVENT_COLS, load_history
+from app.data import BOOKINGS_AWAY, BOOKINGS_HOME, EVENT_COLS, GLOBAL_LEAGUES, load_history
 from app.models.count_model import CountModel, rolling_form
 from app.models.dixon_coles import DixonColes
 from app.models.markets import (
@@ -35,6 +35,14 @@ from app.models.markets import (
 
 TEST_SEASONS = [2023, 2024, 2025]
 MARGINS = [0.0, 0.07]
+
+
+def test_seasons_from_data(data: pd.DataFrame) -> list[int]:
+    """Ultimas 3 temporadas disponibles; dinamico para no quedarse con años fijos."""
+    years = sorted(data["Date"].dt.year.unique())
+    if len(years) < 4:
+        raise SystemExit(f"necesitas al menos 4 temporadas para el walk-forward; hay {len(years)}")
+    return years[-3:]
 
 COUNT_COLS: dict[str, tuple[str, str]] = {
     "corners": EVENT_COLS["corners"],
@@ -89,7 +97,9 @@ def evaluate_ft(model: DixonColes, test: pd.DataFrame) -> None:
     for row in test.itertuples(index=False):
         pred = model.predict(row.HomeTeam, row.AwayTeam)
         probs = pred["probabilities"]
-        mat = np.array(pred["score_matrix"])
+        # Matriz completa (no la recortada 6x6 del heatmap): los mercados de
+        # matriz (par/impar, handicap, total por equipo) necesitan la cola.
+        mat = model.score_matrix(row.HomeTeam, row.AwayTeam)
         band = band_label(max(probs.values()))
         ft_win = win_ft(row.FTHG, row.FTAG)
         pick("FT 1X2", {"H": probs["home"], "D": probs["draw"], "A": probs["away"]}, {ft_win}, band)
@@ -158,9 +168,9 @@ def evaluate_counts(models: dict[str, CountModel], test: pd.DataFrame, forms: di
             )
 
 
-def backtest(df: pd.DataFrame) -> None:
+def backtest(df: pd.DataFrame, seasons: list[int]) -> None:
     PICKS.clear()
-    for season in TEST_SEASONS:
+    for season in seasons:
         train = df[df["Date"].dt.year < season]
         test = df[df["Date"].dt.year == season]
         if len(test) == 0:
@@ -189,12 +199,12 @@ def backtest(df: pd.DataFrame) -> None:
         print(f"  season {season}: picks={len(PICKS)}", flush=True)
 
 
-def report() -> None:
+def report(seasons: list[int]) -> None:
     df = pd.DataFrame(PICKS, columns=["market", "band", "p", "won"])
     for margin in MARGINS:
         net = np.where(df["won"], 1.0 / (df["p"] * (1.0 + margin)) - 1.0, -1.0)
         df[f"net_{margin:.2f}"] = net
-    print(f"\n--- Backtest walk-forward {TEST_SEASONS} (apuesta flat de 1u) ---")
+    print(f"\n--- Backtest walk-forward {seasons} (apuesta flat de 1u) ---")
     print(
         "  "
         + "mercad"
@@ -226,9 +236,10 @@ def report() -> None:
 
 
 if __name__ == "__main__":
-    data = load_history()
+    data = load_history(leagues=GLOBAL_LEAGUES)
     print(
         f"Partidos: {len(data)} | Ligas: {data['League'].nunique()} | Equipos: {data['HomeTeam'].nunique()}"
     )
-    backtest(data)
-    report()
+    seasons = test_seasons_from_data(data)
+    backtest(data, seasons)
+    report(seasons)

@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from app.data import BOOKINGS_AWAY, BOOKINGS_HOME, EVENT_COLS, load_history
+from app.data import BOOKINGS_AWAY, BOOKINGS_HOME, EVENT_COLS, GLOBAL_LEAGUES, load_history
 from app.models.count_model import CountModel
 from app.models.dixon_coles import DEFAULT_DECAY, DixonColes
 
@@ -80,12 +80,15 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
+
     if args.league:
         train_league(args.league.upper())
         return
 
-    data = load_history()
-    ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
+    data = load_history(leagues=GLOBAL_LEAGUES)
+    if data.empty:
+        raise SystemExit(f"no hay datos para el modelo global en data/ ({GLOBAL_LEAGUES})")
 
     ft = DixonColes()
     ft.fit(data["Date"], data["HomeTeam"], data["AwayTeam"], data["FTHG"], data["FTAG"])

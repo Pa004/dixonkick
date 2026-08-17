@@ -6,6 +6,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from app.models.dixon_coles import MAX_GOALS
+
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 
 LEAGUES = {
@@ -16,6 +18,9 @@ LEAGUES = {
     "F1": "france",
     "EC1": "ecuador",
 }
+# Las 5 ligas europeas comparten el modelo global; EC1 (ESPN) entrena aparte
+# con su propio Dixon-Coles y no debe contaminar el artefacto global.
+GLOBAL_LEAGUES = {k: v for k, v in LEAGUES.items() if k != "EC1"}
 COLS = [
     "Div",
     "Date",
@@ -55,7 +60,7 @@ BOOKINGS_AWAY = "BookingsA"
 def load_history(
     leagues: dict[str, str] | None = None, data_dir: Path | None = None
 ) -> pd.DataFrame:
-    leagues = leagues or LEAGUES
+    leagues = leagues if leagues is not None else GLOBAL_LEAGUES
     data_dir = data_dir or DATA_DIR
     frames = []
     for file in sorted(data_dir.glob("*.csv")):
@@ -71,6 +76,11 @@ def load_history(
         df = df.reindex(columns=COLS)
         df["League"] = league_code
         frames.append(df)
+    if not frames:
+        raise ValueError(
+            f"no hay CSVs de {sorted(leagues)} en {data_dir} "
+            "(ejecuta scripts/download_data.py o scripts/download_espn_ecuador.py)"
+        )
     data = pd.concat(frames, ignore_index=True)
     data["Date"] = pd.to_datetime(data["Date"], dayfirst=True, errors="coerce")
     data = data[(data["Date"].dt.year >= 2000) & (data["Date"].dt.year <= 2030)]
@@ -82,6 +92,9 @@ def load_history(
     data[BOOKINGS_HOME] = data["HY"] + 2 * data["HR"]
     data[BOOKINGS_AWAY] = data["AY"] + 2 * data["AR"]
     data = data.dropna(subset=["Date", "FTHG", "FTAG", "HomeTeam", "AwayTeam"])
+    # Marcadores fuera del soporte del grid (MAX_GOALS) son datos corruptos o de
+    # otra disciplina; entrenar con ellos ensucia la correccion tau.
+    data = data[(data["FTHG"] <= MAX_GOALS) & (data["FTAG"] <= MAX_GOALS)]
     data["FTHG"] = data["FTHG"].astype(int)
     data["FTAG"] = data["FTAG"].astype(int)
     return data.sort_values("Date").reset_index(drop=True)

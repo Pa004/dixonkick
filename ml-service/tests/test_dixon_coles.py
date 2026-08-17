@@ -122,3 +122,16 @@ def test_small_sample_predice_con_poquitos_partidos():
     assert p["pick"] in {"H", "D", "A"}
     assert sum(p["probabilities"].values()) == pytest.approx(1.0, abs=1e-6)
     assert "Barcelona SC" in model.teams and "Emelec" in model.teams
+
+
+def test_score_matrix_predict_es_la_completa_recortada():
+    """predict expone la submatriz 6x6 del heatmap; la matriz completa se
+    conserva en score_matrix (los mercados de matriz necesitan la cola)."""
+    from app.models.dixon_coles import HEATMAP_GOALS
+
+    model = synthetic_fit()
+    full = model.score_matrix("Alfa", "Beta")
+    assert full.shape == (model.max_goals + 1, model.max_goals + 1)
+    shown = model.predict("Alfa", "Beta")["score_matrix"]
+    assert np.array(shown).shape == (HEATMAP_GOALS, HEATMAP_GOALS)
+    assert np.array(shown) == pytest.approx(full[:HEATMAP_GOALS, :HEATMAP_GOALS])

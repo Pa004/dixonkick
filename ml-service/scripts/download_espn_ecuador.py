@@ -74,6 +74,7 @@ def parse_month(raw: bytes) -> list[dict]:
         # sync de fixtures, asi que los nombres coinciden 1:1 con el modelo.
         rows.append(
             {
+                "Div": "EC1",
                 "Date": _to_dmy(ev["date"]),
                 "HomeTeam": home["team"]["displayName"],
                 "AwayTeam": away["team"]["displayName"],

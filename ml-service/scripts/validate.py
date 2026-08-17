@@ -13,11 +13,19 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from app.data import BOOKINGS_AWAY, BOOKINGS_HOME, EVENT_COLS, load_history
+from app.data import BOOKINGS_AWAY, BOOKINGS_HOME, EVENT_COLS, GLOBAL_LEAGUES, load_history
 from app.models.count_model import CountModel, rolling_form
 from app.models.dixon_coles import DixonColes
 
 TEST_SEASONS = [2023, 2024, 2025]
+
+
+def test_seasons_from_data(data: pd.DataFrame) -> list[int]:
+    """Ultimas 3 temporadas disponibles; dinamico para no quedarse con años fijos."""
+    years = sorted(data["Date"].dt.year.unique())
+    if len(years) < 4:
+        raise SystemExit(f"necesitas al menos 4 temporadas para el walk-forward; hay {len(years)}")
+    return years[-3:]
 
 COUNT_COLS: dict[str, tuple[str, str]] = {
     "corners": EVENT_COLS["corners"],
@@ -39,7 +47,7 @@ def rps_one(pred: np.ndarray, obs: int) -> float:
     return float(0.5 * np.sum((cdf_pred - cdf_obs) ** 2))
 
 
-def evaluate_counts(df: pd.DataFrame) -> None:
+def evaluate_counts(df: pd.DataFrame, seasons: list[int]) -> None:
     """Walk-forward de los conteos: log-loss del total frente al baseline empirico."""
     for name, (hcol, acol) in COUNT_COLS.items():
         rows = df.dropna(subset=[hcol, acol]).sort_values("Date").reset_index(drop=True)
@@ -50,7 +58,7 @@ def evaluate_counts(df: pd.DataFrame) -> None:
         total_ll = 0.0
         base_ll = 0.0
         n = 0
-        for season in TEST_SEASONS:
+        for season in seasons:
             train = rows[rows["Date"].dt.year < season]
             test = rows[rows["Date"].dt.year == season]
             if len(test) == 0:
@@ -101,9 +109,9 @@ def evaluate_counts(df: pd.DataFrame) -> None:
     print()
 
 
-def evaluate(df: pd.DataFrame) -> None:
+def evaluate(df: pd.DataFrame, seasons: list[int]) -> None:
     all_results = []
-    for season in TEST_SEASONS:
+    for season in seasons:
         train = df[df["Date"].dt.year < season]
         test = df[df["Date"].dt.year == season]
         model = DixonColes()
@@ -154,10 +162,11 @@ def evaluate(df: pd.DataFrame) -> None:
 
 
 if __name__ == "__main__":
-    data = load_history()
+    data = load_history(leagues=GLOBAL_LEAGUES)
     print(
         f"Partidos cargados: {len(data)}  |  Ligas: {data['League'].nunique()}  |  Equipos: {data['HomeTeam'].nunique()}"
     )
-    evaluate(data)
+    seasons = test_seasons_from_data(data)
+    evaluate(data, seasons)
     print("\n--- Mercados de conteo (corners, bookings, tiros, faltas) ---")
-    evaluate_counts(data)
+    evaluate_counts(data, seasons)
