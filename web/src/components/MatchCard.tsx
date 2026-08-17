@@ -102,6 +102,7 @@ function TeamSide({
 
 export default function MatchCard({ fixture }: { fixture: Fixture }) {
   const [open, setOpen] = useState(false);
+  const [matrixOpen, setMatrixOpen] = useState(true);
   const shouldReduce = useReducedMotion();
   const pred = fixture.prediction;
   const d = new Date(fixture.date);
@@ -125,15 +126,25 @@ export default function MatchCard({ fixture }: { fixture: Fixture }) {
           BTTS No:{" "}
           <b className="font-display tabular-nums text-neutro-100">{Math.round(pred.btts_no * 100)}%</b>
         </div>
-        <div className="flex items-center gap-1 text-neutro-400">
+        <button
+          type="button"
+          onClick={() => setMatrixOpen((v) => !v)}
+          aria-expanded={matrixOpen}
+          aria-controls={`matriz-${fixture.id}`}
+          className="flex items-center gap-1 text-neutro-300 transition-colors hover:text-neutro-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento-400"
+        >
           <ChevronDown
-            className={`h-3.5 w-3.5 transition-transform duration-200 motion-reduce:transition-none ${open ? "rotate-180" : ""}`}
+            className={`h-3.5 w-3.5 transition-transform duration-200 motion-reduce:transition-none ${matrixOpen ? "rotate-180" : ""}`}
             aria-hidden="true"
           />
           Matriz de marcador
-        </div>
+        </button>
       </div>
-      <ScoreHeatmap pred={pred} />
+      {matrixOpen && (
+        <div id={`matriz-${fixture.id}`}>
+          <ScoreHeatmap pred={pred} />
+        </div>
+      )}
       {pred.markets && <Markets markets={pred.markets} />}
     </div>
   );

@@ -171,14 +171,23 @@ function HtFtHeatmap({ cells }: { cells: HtFtCell[] }) {
   );
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  const [open, setOpen] = useState(false);
+function Section({
+  title,
+  open,
+  onToggle,
+  children,
+}: {
+  title: string;
+  open: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
   const id = useId();
   return (
     <div className="border-b border-neutro-800/60 last:border-0">
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={onToggle}
         aria-expanded={open}
         aria-controls={id}
         className="flex w-full items-center justify-between py-2 text-left text-xs font-semibold text-neutro-200 transition-colors hover:text-neutro-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento-400"
@@ -198,9 +207,19 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-function CountSection({ title, m }: { title: string; m: CountMarkets }) {
+function CountSection({
+  title,
+  open,
+  onToggle,
+  m,
+}: {
+  title: string;
+  open: boolean;
+  onToggle: () => void;
+  m: CountMarkets;
+}) {
   return (
-    <Section title={title}>
+    <Section title={title} open={open} onToggle={onToggle}>
       <OverUnderRows lines={m.total} />
       <TeamTotalsRows lines={m.team_totals} />
       <MostRows most={m.most} />
@@ -210,6 +229,8 @@ function CountSection({ title, m }: { title: string; m: CountMarkets }) {
 }
 
 export default function Markets({ markets }: { markets: MarketsData }) {
+  const [openSection, setOpenSection] = useState<string | null>(null);
+  const toggle = (title: string) => setOpenSection((v) => (v === title ? null : title));
   const { ft, ht, ht_ft, corners, bookings, shots_on_target, fouls, first_goal, first_corner } = markets;
   return (
     <div className="mt-4 rounded-base border border-neutro-800/60 bg-neutro-950/40 p-3">
@@ -217,7 +238,7 @@ export default function Markets({ markets }: { markets: MarketsData }) {
         Mercados
       </h2>
 
-      <Section title="Resultado">
+      <Section title="Resultado" open={openSection === "Resultado"} onToggle={() => toggle("Resultado")}>
         <Row
           label="Doble oportunidad"
           values={[
@@ -251,7 +272,11 @@ export default function Markets({ markets }: { markets: MarketsData }) {
         />
       </Section>
 
-      <Section title="Marcadores exactos">
+      <Section
+        title="Marcadores exactos"
+        open={openSection === "Marcadores exactos"}
+        onToggle={() => toggle("Marcadores exactos")}
+      >
         {ft.correct_score_top.map((s) => (
           <Row
             key={`${s.home}-${s.away}`}
@@ -262,7 +287,11 @@ export default function Markets({ markets }: { markets: MarketsData }) {
       </Section>
 
       {ht && (
-        <Section title="Primera mitad">
+        <Section
+          title="Primera mitad"
+          open={openSection === "Primera mitad"}
+          onToggle={() => toggle("Primera mitad")}
+        >
           <Row
             label="1X2"
             values={[
@@ -291,18 +320,50 @@ export default function Markets({ markets }: { markets: MarketsData }) {
       )}
 
       {ht_ft && ht_ft.length > 0 && (
-        <Section title="HT/FT">
+        <Section title="HT/FT" open={openSection === "HT/FT"} onToggle={() => toggle("HT/FT")}>
           <HtFtHeatmap cells={ht_ft} />
         </Section>
       )}
 
-      {corners && <CountSection title="Córners" m={corners} />}
-      {bookings && <CountSection title="Tarjetas" m={bookings} />}
-      {shots_on_target && <CountSection title="Tiros a puerta" m={shots_on_target} />}
-      {fouls && <CountSection title="Faltas" m={fouls} />}
+      {corners && (
+        <CountSection
+          title="Córners"
+          open={openSection === "Córners"}
+          onToggle={() => toggle("Córners")}
+          m={corners}
+        />
+      )}
+      {bookings && (
+        <CountSection
+          title="Tarjetas"
+          open={openSection === "Tarjetas"}
+          onToggle={() => toggle("Tarjetas")}
+          m={bookings}
+        />
+      )}
+      {shots_on_target && (
+        <CountSection
+          title="Tiros a puerta"
+          open={openSection === "Tiros a puerta"}
+          onToggle={() => toggle("Tiros a puerta")}
+          m={shots_on_target}
+        />
+      )}
+      {fouls && (
+        <CountSection
+          title="Faltas"
+          open={openSection === "Faltas"}
+          onToggle={() => toggle("Faltas")}
+          m={fouls}
+        />
+      )}
 
       {first_goal && first_corner && (
-        <Section title="Primer evento">
+        <Section
+          title="Primer evento"
+          open={openSection === "Primer evento"}
+          onToggle={() => toggle("Primer evento")}
+        >
           <Row
             label="Primer gol"
             values={[

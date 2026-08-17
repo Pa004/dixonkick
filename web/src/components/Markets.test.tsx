@@ -85,6 +85,28 @@ describe("Markets", () => {
     expect(screen.getByText("Doble oportunidad")).toBeInTheDocument();
   });
 
+  it("mantiene una sola seccion abierta a la vez", () => {
+    render(<Markets markets={MARKETS} />);
+    const resultado = screen.getByRole("button", { name: "Resultado" });
+    const corners = screen.getByRole("button", { name: "Córners" });
+    fireEvent.click(resultado);
+    expect(resultado).toHaveAttribute("aria-expanded", "true");
+    fireEvent.click(corners);
+    expect(resultado).toHaveAttribute("aria-expanded", "false");
+    expect(corners).toHaveAttribute("aria-expanded", "true");
+    expect(screen.queryByText("Doble oportunidad")).not.toBeInTheDocument();
+  });
+
+  it("cierra la seccion abierta al volver a pulsarla", () => {
+    render(<Markets markets={MARKETS} />);
+    const btn = screen.getByRole("button", { name: "Resultado" });
+    fireEvent.click(btn);
+    expect(btn).toHaveAttribute("aria-expanded", "true");
+    fireEvent.click(btn);
+    expect(btn).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Doble oportunidad")).not.toBeInTheDocument();
+  });
+
   it("resalta el valor con mayor probabilidad", () => {
     render(<Markets markets={MARKETS} />);
     fireEvent.click(screen.getByRole("button", { name: "Resultado" }));
