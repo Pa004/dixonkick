@@ -31,6 +31,124 @@ The server syncs fixtures from ESPN on a cron schedule, resolves team names agai
 | `server` | Node / Express + SQLite | ESPN orchestration, team resolution, predictions, tracking |
 | `web` | React 19 / Vite / Tailwind v4 | Responsive SPA that only reads `/api` |
 
+## Architecture
+
+```
+ESPN scoreboard (fixtures, -2..+14 days)
+   │  cron sync (SYNC_CRON, 06:00 local · TZ)
+   ▼
+server  Node/Express + SQLite  (:4000)
+   │  runSync → refreshFixtures → resolveTeam → predictFixture → persist
+   │  POST /predict
+   ▼
+ml-service  FastAPI  (:8001)
+   │  models loaded from artifacts/*.npz
+   │  (Dixon-Coles FT & HT, HT/FT conditional, Negative-Binomial counts)
+   ▼
+web  React 19 + Vite  (:5173)
+   │  reads /api only (Vite proxy in dev)
+```
+
+Key design points:
+
+- **One shared model for the 5 European leagues**; Liga Pro (EC1) uses its own Dixon-Coles trained on ESPN history — EC1 data never touches the global model.
+- **Artifacts are reproducible**: `ml-service/data/` and `ml-service/artifacts/` are gitignored and regenerated with the download scripts + `scripts/train.py`.
+- **Confidence bands have a single source of truth**: the ml-service serves `GET /bands` and the server caches it with a fallback.
+- **Auto re-prediction**: if the model is retrained (`trained_at` changes), the server force-repredicts pending fixtures.
+
+### Repository structure
+
+```
+ml-service/              # Python / FastAPI — statistical models
+  app/
+    api.py               # /predict, /teams, /health, /models, /bands
+    data.py              # loads historical CSVs (5 European leagues + EC1)
+    models/
+      dixon_coles.py     # Dixon-Coles for FT and HT scores
+      count_model.py     # Negative-Binomial for count markets (recent form, k=5)
+      markets.py         # ~20 derived markets
+  scripts/               # download_data, download_espn_ecuador, train, validate, backtest
+  tests/                 # pytest (37 tests)
+  requirements.lock      # pinned Python dependencies
+
+server/                  # Node / Express + SQLite — orchestration
+  src/
+    index.ts             # bootstrap, cron sync, health-check of ml-service
+    config.ts            # env: PORT, ML_URL, SYNC_CRON, DB_PATH, REFRESH_TOKEN, CORS
+    db.ts                # node:sqlite — fixtures, picks, stats, meta
+    teams.ts             # resolves ESPN display names → model team names (fuzzy ≥ 0.8)
+    dates.ts             # local dates (TZ) for the fixture window and filter
+    providers/espn.ts    # ESPN scoreboard client
+    routes/api.ts        # /api/leagues, /api/fixtures, /api/stats, /api/refresh
+    services/predict.ts  # runSync, re-prediction by trained_at, backfill
+    data/teamOverrides.ts   # ESPN → model aliases (single source)
+    lib/json.ts          # safe JSON response helpers
+  package.json
+
+web/                     # React 19 / Vite / Tailwind v4 — frontend
+  src/
+    App.tsx              # league tabs, silent auto-refresh every 60s
+    api.ts · bands.ts · heat.ts · utils.ts
+    components/          # MatchCard, Markets, ProbabilityBar, ConfidenceBadge, BandLegend,
+                         #   Countdown, MatchToolbar, SpotlightCard, Sidebar, Header,
+                         #   ThemeToggle, Tooltip, ErrorBoundary
+    components/ui/       # shadcn/ui primitives: badge, button, select, dropdown-menu, tooltip
+    hooks/useTheme.ts    # light/dark theme
+  e2e/                   # smoke (7 checks) + responsive (51 checks) via playwright-core
+  scripts/               # verify-* checks and screenshot helper
+  package.json
+```
+
+### Key packages
+
+**ml-service** (Python)
+
+| Package | Purpose |
+|---------|---------|
+| fastapi + uvicorn | API server |
+| numpy · scipy · pandas | model math and data |
+| pydantic | request/response validation |
+| pytest · httpx | tests (httpx is required by FastAPI's TestClient) |
+
+**server** (Node)
+
+| Package | Purpose |
+|---------|---------|
+| express | HTTP API |
+| node-cron | sync schedule |
+| cors · dotenv | middleware and env |
+| `node:sqlite` (built-in) | persistence |
+| dev: tsx · typescript · vitest · eslint · prettier | running and tooling |
+
+**web** (React)
+
+| Package | Purpose |
+|---------|---------|
+| react · react-dom | UI |
+| @base-ui/react + shadcn/ui | accessible primitives |
+| lucide-react | icons |
+| motion | animations |
+| tailwindcss v4 (@tailwindcss/vite) | styling |
+| dev: vite · vitest · testing-library · playwright-core · shadcn | build, tests, e2e |
+
+### Testing & CI
+
+```bash
+# ml-service (Python)
+cd ml-service && python -m ruff check app tests scripts && python -m ruff format --check . && python -m pytest tests -q   # 37 tests
+
+# server (Node)
+cd server && npm run lint && npm test && npm run typecheck                                                            # 23 tests
+
+# web (React)
+cd web && npm run lint && npm test && npm run typecheck                                                               # 28 tests
+
+# e2e (requires the three services running)
+cd web && npm run test:e2e && npm run test:e2e:responsive                                                              # 7 + 51 checks
+```
+
+GitHub Actions (`.github/workflows/ci.yml`) runs lint, typecheck, tests and `pip-audit` for all three services on every push.
+
 ## Getting started
 
 ```bash
