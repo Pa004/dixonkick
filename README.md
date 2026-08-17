@@ -129,7 +129,7 @@ Hitos principales y qué se arregló:
 
 ## Puesta en marcha
 
-Requisitos: Node.js >= 22 (usa `node:sqlite` y `fetch` nativo), Python >= 3.11, npm.
+Requisitos: Node.js >= 22 (usa `node:sqlite` y `fetch` nativo), Python >= 3.12 (recomendado 3.13, igual al entorno dev y al CI), npm.
 
 Orden de arranque: primero el modelo, luego el server, luego el web.
 
