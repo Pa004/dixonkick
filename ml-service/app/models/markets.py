@@ -19,6 +19,21 @@ import numpy as np
 
 RESULT_LABELS = ["H", "D", "A"]
 
+# Configuracion de mercados (fuente de verdad consumida por la API):
+# lineas de total, total por equipo y handicap para FT, HT y cada conteo.
+FT_LINES = [0.5, 1.5, 2.5, 3.5, 4.5]
+AH_LINES = [-1.5, -1.0, -0.5, 0.0, 0.5, 1.0, 1.5]
+TEAM_TOTAL_LINES = [0.5, 1.5, 2.5]
+HT_LINES = [0.5, 1.5]
+
+# mercado -> (lineas total, lineas total por equipo, lineas handicap)
+COUNT_GROUPS: dict[str, tuple[list[float], list[float], list[float]]] = {
+    "corners": ([8.5, 9.5, 10.5], [3.5, 4.5, 5.5], [-2.5, -1.5]),
+    "bookings": ([3.5, 4.5, 5.5], [1.5, 2.5], [-1.5, -0.5]),
+    "shots_on_target": ([8.5], [3.5, 4.5], [-2.5, -1.5]),
+    "fouls": ([20.5, 22.5], [9.5, 10.5], [-2.5]),
+}
+
 
 def _over_from_marginal(marg: np.ndarray, line: float) -> float:
     idx = np.arange(marg.size)

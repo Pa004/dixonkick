@@ -8,7 +8,7 @@ from pathlib import Path
 
 import numpy as np
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from app.models import markets
 from app.models.count_model import CountModel
@@ -16,18 +16,12 @@ from app.models.dixon_coles import DixonColes, confidence_bands
 
 ARTIFACT_DIR = Path(__file__).resolve().parent.parent / "artifacts"
 
-FT_LINES = [0.5, 1.5, 2.5, 3.5, 4.5]
-AH_LINES = [-1.5, -1.0, -0.5, 0.0, 0.5, 1.0, 1.5]
-TEAM_TOTAL_LINES = [0.5, 1.5, 2.5]
-HT_LINES = [0.5, 1.5]
-
-# mercado -> (lineas total, lineas total por equipo, lineas handicap)
-COUNT_GROUPS: dict[str, tuple[list[float], list[float], list[float]]] = {
-    "corners": ([8.5, 9.5, 10.5], [3.5, 4.5, 5.5], [-2.5, -1.5]),
-    "bookings": ([3.5, 4.5, 5.5], [1.5, 2.5], [-1.5, -0.5]),
-    "shots_on_target": ([8.5], [3.5, 4.5], [-2.5, -1.5]),
-    "fouls": ([20.5, 22.5], [9.5, 10.5], [-2.5]),
-}
+# Lineas y grupos de mercado centralizados en app/models/markets.py
+FT_LINES = markets.FT_LINES
+AH_LINES = markets.AH_LINES
+TEAM_TOTAL_LINES = markets.TEAM_TOTAL_LINES
+HT_LINES = markets.HT_LINES
+COUNT_GROUPS = markets.COUNT_GROUPS
 
 
 class Models:
@@ -87,6 +81,21 @@ class Fixture(BaseModel):
     away: str
     league: str = "global"
 
+    @field_validator("home", "away")
+    @classmethod
+    def nombre_no_vacio(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("el nombre del equipo no puede estar vacío")
+        return v
+
+    @field_validator("league")
+    @classmethod
+    def liga_conocida(cls, v: str) -> str:
+        if v not in {"global", "EC1"}:
+            raise ValueError("liga desconocida; usa 'global' o 'EC1'")
+        return v
+
 
 def select_model(league: str) -> DixonColes:
     """Modelo FT para la liga. EC1 usa su modelo por-liga; el resto, el global."""
@@ -113,10 +122,11 @@ app = FastAPI(title="FutbolTipster ML Service", version="0.2.0", lifespan=lifesp
 
 
 def build_prediction(home: str, away: str, base_model: DixonColes) -> dict:
-    base = base_model.predict(home, away)
+    # La matriz se calcula una sola vez y se comparte con predict (evita doble grid)
     mat = base_model.score_matrix(home, away)
+    base = base_model.predict(home, away, score_matrix=mat)
 
-    out: dict = {
+    out: dict[str, object] = {
         "ft": {
             "double_chance": markets.double_chance(base["probabilities"]),
             "over_under": markets.total_markets(mat, FT_LINES),

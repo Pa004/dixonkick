@@ -123,7 +123,12 @@ class DixonColes:
         y = grid_y.ravel()
         tau = self._tau(self.rho, np.full_like(x, lam_h), np.full_like(x, lam_a), x, y)
         probs = (poisson.pmf(x, lam_h) * poisson.pmf(y, lam_a) * tau).reshape(max_g + 1, max_g + 1)
-        return probs / probs.sum()
+        total = probs.sum()
+        if not np.isfinite(total) or total <= 0:
+            # Lambdas degeneradas (equipo sin datos suficientes): distribucion
+            # uniforme para no romper los mercados derivados de la matriz.
+            return np.full((max_g + 1, max_g + 1), 1.0 / (max_g + 1) ** 2)
+        return probs / total
 
     def save(self, path: str) -> None:
         np.savez(
@@ -140,7 +145,7 @@ class DixonColes:
 
     @classmethod
     def load(cls, path: str) -> DixonColes:
-        data = np.load(path, allow_pickle=True)
+        data = np.load(path)
         model = cls()
         model.teams = [str(t) for t in data["teams"]]
         model.idx = {t: i for i, t in enumerate(model.teams)}
@@ -166,8 +171,9 @@ class DixonColes:
             return 0.0
         return float(getattr(self, attr)[i])
 
-    def predict(self, home: str, away: str) -> dict:
-        mat = self.score_matrix(home, away)
+    def predict(self, home: str, away: str, score_matrix: np.ndarray | None = None) -> dict:
+        # La matriz se calcula una sola vez: build_prediction la comparte con predict
+        mat = self.score_matrix(home, away) if score_matrix is None else score_matrix
         p_home = float(mat[np.tril_indices_from(mat, -1)].sum())
         p_away = float(mat[np.triu_indices_from(mat, 1)].sum())
         p_draw = float(np.trace(mat))

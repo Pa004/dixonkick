@@ -14,7 +14,7 @@ client = TestClient(app)
 
 
 @pytest.fixture(scope="module")
-def booted_app():
+def booted_app(synthetic_artifacts):
     with TestClient(app) as c:
         yield c
 
@@ -58,3 +58,16 @@ def test_predict_default_usa_modelo_global(booted_app):
     )
     assert res.status_code == 200
     assert res.json()["league"] == "global"
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"home": "", "away": "X", "league": "global"},
+        {"home": "X", "away": "  ", "league": "global"},
+        {"home": "X", "away": "Y", "league": "premier"},
+    ],
+)
+def test_predict_valida_entrada_con_422(booted_app, body):
+    res = booted_app.post("/predict", json=body)
+    assert res.status_code == 422

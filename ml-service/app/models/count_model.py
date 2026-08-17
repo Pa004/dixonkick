@@ -68,6 +68,63 @@ def rolling_form(dates, home_team, away_team, home_count, away_count, k: int = F
     return home_form, away_form, team_form
 
 
+def _nll_grad(
+    p: np.ndarray,
+    i_home: np.ndarray,
+    i_away: np.ndarray,
+    home_form: np.ndarray,
+    away_form: np.ndarray,
+    home_count: np.ndarray,
+    away_count: np.ndarray,
+    weights: np.ndarray,
+    n_teams: int,
+) -> tuple[float, np.ndarray]:
+    """nll y gradiente analitico del Negativo-Binomial; aislado a nivel de modulo
+    para poder testear el gradiente por diferencias finitas."""
+    free = n_teams - 1
+    mu, attack_free, defense_free = p[0], p[1 : 1 + free], p[1 + free : 1 + 2 * free]
+    gamma, beta_form, alpha_od = p[1 + 2 * free], p[2 + 2 * free], p[3 + 2 * free]
+    att = np.concatenate([[0.0], attack_free])
+    de = np.concatenate([[0.0], defense_free])
+    lam_h = np.exp(np.clip(mu + att[i_home] + de[i_away] + gamma + beta_form * home_form, -700, 700))
+    lam_a = np.exp(np.clip(mu + att[i_away] + de[i_home] + beta_form * away_form, -700, 700))
+    r = 1.0 / alpha_od
+    like_h = np.clip(nbinom.pmf(home_count, r, r / (r + lam_h)), 1e-12, None)
+    like_a = np.clip(nbinom.pmf(away_count, r, r / (r + lam_a)), 1e-12, None)
+    nll = -np.sum(weights * (np.log(like_h) + np.log(like_a)))
+
+    # d log P(k; mu) / d mu = (k - mu) / (mu * (1 + alpha * mu))
+    sh = (home_count - lam_h) / (lam_h * (1.0 + alpha_od * lam_h))
+    sa = (away_count - lam_a) / (lam_a * (1.0 + alpha_od * lam_a))
+    wh_sh = weights * sh * lam_h
+    wh_sa = weights * sa * lam_a
+
+    g_att = -(
+        np.bincount(i_home, weights=wh_sh, minlength=n_teams)
+        + np.bincount(i_away, weights=wh_sa, minlength=n_teams)
+    )
+    g_def = -(
+        np.bincount(i_away, weights=wh_sh, minlength=n_teams)
+        + np.bincount(i_home, weights=wh_sa, minlength=n_teams)
+    )
+    grad = np.zeros(4 + 2 * free)
+    grad[0] = -np.sum(wh_sh + wh_sa)
+    grad[1 : 1 + free] = g_att[1:]
+    grad[1 + free : 1 + 2 * free] = g_def[1:]
+    grad[1 + 2 * free] = -np.sum(wh_sh)
+    grad[2 + 2 * free] = -np.sum(wh_sh * home_form + wh_sa * away_form)
+    # d log P / d alpha (la normalizacion Gamma depende de r=1/alpha)
+    dr_da = -1.0 / alpha_od**2
+    p_h = r / (r + lam_h)
+    p_a = r / (r + lam_a)
+    dph = (digamma(home_count + r) - digamma(r) + np.log(p_h)) * dr_da
+    dph += (r / p_h - home_count / (1.0 - p_h)) * dr_da * lam_h / (r + lam_h) ** 2
+    dpa = (digamma(away_count + r) - digamma(r) + np.log(p_a)) * dr_da
+    dpa += (r / p_a - away_count / (1.0 - p_a)) * dr_da * lam_a / (r + lam_a) ** 2
+    grad[3 + 2 * free] = -np.sum(weights * (dph + dpa))
+    return nll, grad
+
+
 class CountModel:
     def __init__(
         self, decay: float = DEFAULT_DECAY, max_count: int = MAX_COUNT, form_k: int = FORM_K
@@ -105,74 +162,29 @@ class CountModel:
         weights = np.exp(-self.decay * age_days)
 
         free = n - 1  # el equipo de referencia (indice 0) esta fijado a 0
-        n_att = free
 
         def unpack(p):
             mu = p[0]
-            attack_free = p[1 : 1 + n_att]
-            defense_free = p[1 + n_att : 1 + 2 * n_att]
-            gamma = p[1 + 2 * n_att]
-            beta_form = p[2 + 2 * n_att]
-            alpha_od = p[3 + 2 * n_att]
+            attack_free = p[1 : 1 + free]
+            defense_free = p[1 + free : 1 + 2 * free]
+            gamma = p[1 + 2 * free]
+            beta_form = p[2 + 2 * free]
+            alpha_od = p[3 + 2 * free]
             return mu, attack_free, defense_free, gamma, beta_form, alpha_od
-
-        def nll_and_jac(p):
-            mu, attack_free, defense_free, gamma, beta_form, alpha_od = unpack(p)
-            att = np.concatenate([[0.0], attack_free])
-            de = np.concatenate([[0.0], defense_free])
-            lam_h = np.exp(
-                np.clip(mu + att[i_home] + de[i_away] + gamma + beta_form * home_form, -700, 700)
-            )
-            lam_a = np.exp(
-                np.clip(mu + att[i_away] + de[i_home] + beta_form * away_form, -700, 700)
-            )
-            r = 1.0 / alpha_od
-            like_h = np.clip(nbinom.pmf(home_count, r, r / (r + lam_h)), 1e-12, None)
-            like_a = np.clip(nbinom.pmf(away_count, r, r / (r + lam_a)), 1e-12, None)
-            nll_val = -np.sum(weights * (np.log(like_h) + np.log(like_a)))
-
-            # d log P(k; mu) / d mu = (k - mu) / (mu * (1 + alpha * mu))
-            sh = (home_count - lam_h) / (lam_h * (1.0 + alpha_od * lam_h))
-            sa = (away_count - lam_a) / (lam_a * (1.0 + alpha_od * lam_a))
-            wh_sh = weights * sh * lam_h
-            wh_sa = weights * sa * lam_a
-
-            g_att = -(
-                np.bincount(i_home, weights=wh_sh, minlength=n)
-                + np.bincount(i_away, weights=wh_sa, minlength=n)
-            )
-            g_def = -(
-                np.bincount(i_away, weights=wh_sh, minlength=n)
-                + np.bincount(i_home, weights=wh_sa, minlength=n)
-            )
-            grad = np.zeros(3 + 2 * n_att + 2)
-            grad[0] = -np.sum(wh_sh + wh_sa)
-            grad[1 : 1 + n_att] = g_att[1:]
-            grad[1 + n_att : 1 + 2 * n_att] = g_def[1:]
-            grad[1 + 2 * n_att] = -np.sum(wh_sh)
-            grad[2 + 2 * n_att] = -np.sum(wh_sh * home_form + wh_sa * away_form)
-            # d log P / d alpha (la normalizacion Gamma depende de r=1/alpha)
-            dr_da = -1.0 / alpha_od**2
-            p_h = r / (r + lam_h)
-            p_a = r / (r + lam_a)
-            dph = (digamma(home_count + r) - digamma(r) + np.log(p_h)) * dr_da
-            dph += (r / p_h - home_count / (1.0 - p_h)) * dr_da * lam_h / (r + lam_h) ** 2
-            dpa = (digamma(away_count + r) - digamma(r) + np.log(p_a)) * dr_da
-            dpa += (r / p_a - away_count / (1.0 - p_a)) * dr_da * lam_a / (r + lam_a) ** 2
-            grad[3 + 2 * n_att] = -np.sum(weights * (dph + dpa))
-            return nll_val, grad
 
         base_rate = 0.5 * (float(np.mean(home_count)) + float(np.mean(away_count)))
         p0 = np.concatenate(
-            [[np.log(max(base_rate, 1e-3))], np.zeros(2 * n_att), [0.2], [0.0], [0.2]]
+            [[np.log(max(base_rate, 1e-3))], np.zeros(2 * free), [0.2], [0.0], [0.2]]
         )
-        bounds = [(None, None)] * (1 + 2 * n_att) + [
+        bounds = [(None, None)] * (1 + 2 * free) + [
             (None, None),
             (None, None),
             (ALPHA_MIN, ALPHA_MAX),
         ]
         res = minimize(
-            nll_and_jac,
+            lambda p: _nll_grad(
+                p, i_home, i_away, home_form, away_form, home_count, away_count, weights, n
+            ),
             p0,
             jac=True,
             method="L-BFGS-B",
@@ -221,7 +233,7 @@ class CountModel:
 
     @classmethod
     def load(cls, path: str) -> CountModel:
-        data = np.load(path, allow_pickle=True)
+        data = np.load(path)
         model = cls()
         model.teams = [str(t) for t in data["teams"]]
         model.idx = {t: i for i, t in enumerate(model.teams)}
